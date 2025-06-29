@@ -9,8 +9,8 @@ export interface ImageTransform {
 }
 
 export interface ImageDimensions {
-    size: number;
-    stencilRadius: number;
+	size: number;
+	stencilRadius: number;
 }
 
 export type ImageWorkerRPCHandlersWorker = {

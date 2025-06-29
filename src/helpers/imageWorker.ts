@@ -1,12 +1,21 @@
-import type { ImageTransform, ImageDimensions, ImageWorkerRPCHandlersMain, ImageWorkerRPCHandlersWorker } from './imageWorkerRPCConfig';
+import type {
+	ImageTransform,
+	ImageDimensions,
+	ImageWorkerRPCHandlersMain,
+	ImageWorkerRPCHandlersWorker,
+} from './imageWorkerRPCConfig';
 import { RPCController } from './RPC';
-import init, { ImageProcessor, ImageTransform as IT, ImageDimensions as ID } from '../../image-processing/pkg/image_processing';
+import init, {
+	ImageProcessor,
+	ImageTransform as IT,
+	ImageDimensions as ID,
+} from '../../image-processing/pkg/image_processing';
 import wasmbin from '../../image-processing/pkg/image_processing_bg.wasm?url';
 
 let imageProcessor: ImageProcessor | null = null;
 
 function convertDimensions(dimensions: ImageDimensions): ID {
-    return new ID(dimensions.size, dimensions.stencilRadius);
+	return new ID(dimensions.size, dimensions.stencilRadius);
 }
 
 const RPC = new RPCController<ImageWorkerRPCHandlersWorker, ImageWorkerRPCHandlersMain>(
@@ -19,20 +28,20 @@ const RPC = new RPCController<ImageWorkerRPCHandlersWorker, ImageWorkerRPCHandle
 		},
 		render(data: Uint8Array, dimensions: ImageDimensions, state: ImageTransform, ring: boolean) {
 			const transform = new IT(state.posX, state.posY, state.scale, state.flipped);
-            const dims = convertDimensions(dimensions);
+			const dims = convertDimensions(dimensions);
 
 			const img = imageProcessor!.render(data, dims, transform, ring);
 
 			RPC.call('onRenderFinished', undefined, img);
 		},
 		clearMask(dimensions: ImageDimensions) {
-            const dims = convertDimensions(dimensions);
+			const dims = convertDimensions(dimensions);
 			const mask = imageProcessor!.clear_mask(dims);
 
 			RPC.call('onMaskUpdated', undefined, mask);
 		},
 		setMask(data: Uint8Array, dimensions: ImageDimensions) {
-            const dims = convertDimensions(dimensions);
+			const dims = convertDimensions(dimensions);
 			imageProcessor!.set_mask(data, dims);
 
 			RPC.call('onMaskUpdated', undefined, undefined);

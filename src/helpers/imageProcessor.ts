@@ -1,11 +1,16 @@
-import type { ImageDimensions, ImageTransform, ImageWorkerRPCHandlersMain, ImageWorkerRPCHandlersWorker } from './imageWorkerRPCConfig';
+import type {
+	ImageDimensions,
+	ImageTransform,
+	ImageWorkerRPCHandlersMain,
+	ImageWorkerRPCHandlersWorker,
+} from './imageWorkerRPCConfig';
 import { RPCController } from './RPC';
 import ImageWorker from './imageWorker?worker';
 
 interface RenderTask {
 	type: 'render';
 	data: Uint8Array;
-    dims: ImageDimensions;
+	dims: ImageDimensions;
 	state: ImageTransform;
 	ring: boolean;
 	img: HTMLImageElement;
@@ -23,12 +28,12 @@ interface UpdateMaskTask {
 interface SetMaskTask {
 	type: 'setMask';
 	data: Uint8Array;
-    dims: ImageDimensions;
+	dims: ImageDimensions;
 }
 
 interface ClearMaskTask {
 	type: 'clearMask';
-    dims: ImageDimensions;
+	dims: ImageDimensions;
 	cb: (img: Uint8Array) => void;
 }
 

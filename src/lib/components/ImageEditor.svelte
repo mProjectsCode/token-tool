@@ -71,11 +71,9 @@
 	let previewImg = $state<HTMLImageElement | undefined>(undefined);
 	let maskImg = $state<HTMLImageElement | undefined>(undefined);
 	let fileInput = $state<HTMLInputElement | null>();
-	
+
 	let canvasSize = $state<number>(0);
-	let canvasSizeMul = $derived<number>(
-		canvasSize > 0 ? canvasSize / dimensions.size : 1,
-	);
+	let canvasSizeMul = $derived<number>(canvasSize > 0 ? canvasSize / dimensions.size : 1);
 
 	function onDimsChange() {
 		if (activeImage && maskImg) {
@@ -246,7 +244,7 @@
 		<Card.Content class="flex min-h-0 flex-1 flex-col gap-2">
 			<Input
 				bind:ref={fileInput}
-				class="bg-primary! text-primary-foreground hover:bg-primary/90! focus-visible:border-ring focus-visible:ring-ring/50 rounded-md text-sm font-medium outline-none transition-all border-none"
+				class="bg-primary! text-primary-foreground hover:bg-primary/90! focus-visible:border-ring focus-visible:ring-ring/50 rounded-md border-none text-sm font-medium transition-all outline-none"
 				id="picture"
 				type="file"
 				accept="image/*"
@@ -261,7 +259,7 @@
 							<!-- svelte-ignore a11y_click_events_have_key_events -->
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
-								class={'mb-2 flex cursor-pointer flex-col items-center justify-center rounded p-2 border-2 hover:border-primary ' +
+								class={'hover:border-primary mb-2 flex cursor-pointer flex-col items-center justify-center rounded border-2 p-2 ' +
 									(activeImage?.name === image.name ? 'border-primary' : '')}
 								onclick={() => setActiveImage(image)}
 							>
@@ -314,8 +312,10 @@
 						src={URL.createObjectURL(new Blob([activeImage.data]))}
 						alt={activeImage.name}
 						class="absolute top-1/2 left-1/2"
-						style="transform: translate(calc({(activeImage.transform.posX ?? 0) * canvasSizeMul}px - 50%), calc({(activeImage.transform.posY ?? 0) * canvasSizeMul}px - 50%)) scale({(activeImage.transform.scale ??
-							1.0) * canvasSizeMul}); max-width: unset; max-height: unset;"
+						style="transform: translate(calc({(activeImage.transform.posX ?? 0) *
+							canvasSizeMul}px - 50%), calc({(activeImage.transform.posY ?? 0) *
+							canvasSizeMul}px - 50%)) scale({(activeImage.transform.scale ?? 1.0) *
+							canvasSizeMul}); max-width: unset; max-height: unset;"
 					/>
 				{/if}
 				<svg class="absolute" height={canvasSize} width={canvasSize}>
@@ -351,7 +351,7 @@
 							</Select.Content>
 						</Select.Root>
 
-						<Checkbox bind:checked={activeImage.oversized}  onCheckedChange={() => onDimsChange()} />
+						<Checkbox bind:checked={activeImage.oversized} onCheckedChange={() => onDimsChange()} />
 						<Label>Oversized Token</Label>
 					</div>
 					<!-- Scale -->
