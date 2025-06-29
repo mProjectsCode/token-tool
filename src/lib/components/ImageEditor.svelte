@@ -220,7 +220,7 @@
 	function zoomIn() {
 		if (!activeImage) return;
 
-		activeImage.transform.scale += 0.1;
+		activeImage.transform.scale += activeImage.transform.scale * 0.1;
 		if (activeImage.transform.scale > 10) {
 			activeImage.transform.scale = 10; // Limit max scale
 		}
@@ -229,7 +229,7 @@
 	function zoomOut() {
 		if (!activeImage) return;
 
-		activeImage.transform.scale -= 0.1;
+		activeImage.transform.scale -= activeImage.transform.scale * 0.1;
 		if (activeImage.transform.scale < 0.1) {
 			activeImage.transform.scale = 0.1; // Limit min scale
 		}
@@ -237,7 +237,7 @@
 </script>
 
 <div class="flex h-screen max-h-screen flex-row items-stretch justify-center p-4">
-	<Card.Root class="flex-1/5">
+	<Card.Root class="max-w-fit min-w-fit">
 		<Card.Header>
 			<Card.Title>Image Selection</Card.Title>
 		</Card.Header>
@@ -333,75 +333,71 @@
 			</div>
 		</div>
 	</div>
-	<Card.Root class="flex-1/5">
+	<Card.Root class="min-w-[400px] flex-1/5">
 		<Card.Header>
 			<Card.Title>Editor Controls</Card.Title>
 		</Card.Header>
 		<Card.Content>
 			{#if activeImage}
-				<div class="flex flex-col gap-4">
-					<div>
-						<span>Token Size</span>
-						<Select.Root type="single" bind:value={activeImage.size} onValueChange={() => onDimsChange()}>
-							<Select.Trigger class="w-[180px]">{activeImage.size}</Select.Trigger>
-							<Select.Content>
-								{#each Object.values(CreatureSize) as size}
-									<Select.Item value={size}>{size}</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
+				<div class="grid grid-cols-2 gap-4">
+					<Label>Token size</Label>
+					<Select.Root type="single" bind:value={activeImage.size} onValueChange={() => onDimsChange()}>
+						<Select.Trigger class="w-full">{activeImage.size}</Select.Trigger>
+						<Select.Content>
+							{#each Object.values(CreatureSize) as size}
+								<Select.Item value={size}>{size}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
 
-						<Checkbox bind:checked={activeImage.oversized} onCheckedChange={() => onDimsChange()} />
-						<Label>Oversized Token</Label>
-					</div>
+					<Label>Oversized token</Label>
+					<Checkbox bind:checked={activeImage.oversized} onCheckedChange={() => onDimsChange()} />
+
 					<!-- Scale -->
+					<Label>Scale</Label>
 					<div>
-						<span>Scale: {Math.round(activeImage.transform.scale * 100)}%</span>
 						<Button onclick={() => zoomOut()}>-</Button>
+						{Math.round(activeImage.transform.scale * 100)}%
 						<Button onclick={() => zoomIn()}>+</Button>
 					</div>
-					<!-- Positioning -->
-					<div>
-						<span>Position X</span>
-						<Input type="number" min="-1000" max="1000" bind:value={activeImage.transform.posX} />
-					</div>
-					<div>
-						<span>Position Y</span>
-						<Input type="number" min="-1000" max="1000" bind:value={activeImage.transform.posY} />
-					</div>
-					<div>
-						<span>Paint Size</span>
-						<Slider type="single" min={10} max={dimensions.size / 2} bind:value={brushSize}></Slider>
-					</div>
-					<div>
-						<Dialog.Root
-							onOpenChange={async open => {
-								await tick();
-								if (open && activeImage && previewImg) {
-									console.log(`Rendering preview for ${activeImage.name}`);
 
-									imageProcessor.render(
-										activeImage.data,
-										$state.snapshot(dimensions),
-										$state.snapshot(activeImage.transform),
-										true,
-										previewImg,
-									);
-								}
-							}}
-						>
-							<Dialog.Trigger>Preview</Dialog.Trigger>
-							<Dialog.Content class="w-3xl max-w-3xl sm:max-w-3xl">
-								<Dialog.Header>
-									<Dialog.Title>Preview</Dialog.Title>
-									<Dialog.Description>
-										A preview of your token with a simple white border and dark background.
-									</Dialog.Description>
-								</Dialog.Header>
-								<img bind:this={previewImg} alt="Preview" class="border border-gray-300" />
-							</Dialog.Content>
-						</Dialog.Root>
-					</div>
+					<!-- Positioning -->
+					<Label>Position X</Label>
+					<Input type="number" min="-1000" max="1000" bind:value={activeImage.transform.posX} />
+					<Label>Position Y</Label>
+					<Input type="number" min="-1000" max="1000" bind:value={activeImage.transform.posY} />
+
+					<!-- Painting -->
+					<Label>Paint size</Label>
+					<Slider type="single" min={10} max={dimensions.size / 2} bind:value={brushSize}></Slider>
+
+					<Dialog.Root
+						onOpenChange={async open => {
+							await tick();
+							if (open && activeImage && previewImg) {
+								console.log(`Rendering preview for ${activeImage.name}`);
+
+								imageProcessor.render(
+									activeImage.data,
+									$state.snapshot(dimensions),
+									$state.snapshot(activeImage.transform),
+									true,
+									previewImg,
+								);
+							}
+						}}
+					>
+						<Dialog.Trigger>Preview</Dialog.Trigger>
+						<Dialog.Content class="w-3xl max-w-3xl sm:max-w-3xl">
+							<Dialog.Header>
+								<Dialog.Title>Preview</Dialog.Title>
+								<Dialog.Description>
+									A preview of your token with a simple white border and dark background.
+								</Dialog.Description>
+							</Dialog.Header>
+							<img bind:this={previewImg} alt="Preview" class="border border-gray-300" />
+						</Dialog.Content>
+					</Dialog.Root>
 				</div>
 			{:else}
 				<p>No image selected for editing.</p>
