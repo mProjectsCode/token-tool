@@ -1,0 +1,12 @@
+{
+	"plugins": ["prettier-plugin-svelte", "prettier-plugin-tailwindcss"],
+
+	"printWidth": 120,
+	"useTabs": true,
+	"tabWidth": 4,
+	"semi": true,
+	"singleQuote": true,
+	"arrowParens": "avoid",
+
+	"svelteAllowShorthand": false
+}
