@@ -1,4 +1,4 @@
-import type { ImageDimensions } from './imageWorkerRPCConfig';
+import type { ImageDimensions } from './image/imageWorkerRPC';
 
 export async function readFileAsArrayBuffer(file: File): Promise<Uint8Array> {
 	return new Promise((resolve, reject) => {
@@ -60,4 +60,49 @@ export function remapRange(value: number, oldMin: number, oldMax: number, newMin
 		throw new Error('Old range cannot be zero.');
 	}
 	return ((value - oldMin) * (newMax - newMin)) / (oldMax - oldMin) + newMin;
+}
+
+export function debounce<F extends (...args: Args) => void, const Args extends any[]>(
+	callback: F,
+	wait: number,
+): (...args: Args) => void {
+	let timeoutId: number | undefined = undefined;
+	return (...args) => {
+		window.clearTimeout(timeoutId);
+		timeoutId = window.setTimeout(() => {
+			callback(...args);
+		}, wait);
+	};
+}
+
+export class Throttle<F extends (...args: any[]) => void> {
+	private intervalId: number | undefined = undefined;
+	private lastArgs: Parameters<F> | undefined = undefined;
+
+	constructor(
+		private callback: F,
+		private wait: number,
+	) {
+		this.intervalId = window.setInterval(() => {
+			if (this.lastArgs !== undefined) {
+				this.callback(...this.lastArgs);
+				this.lastArgs = undefined;
+			}
+		}, this.wait);
+	}
+
+	public destroy(): void {
+		if (this.intervalId) {
+			window.clearInterval(this.intervalId);
+			this.intervalId = undefined;
+		}
+	}
+
+	public call(...args: Parameters<F>): void {
+		if (!this.intervalId) {
+			throw new Error('Throttle has been destroyed and cannot be used anymore.');
+		}
+
+		this.lastArgs = args;
+	}
 }

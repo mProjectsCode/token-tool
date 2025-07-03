@@ -7,6 +7,5 @@ A WIP tool to turn background free images into usable images for Foundrys Dynami
 - ability to save images
 - good UI
 - editor zoom
-- brush size preview and lasso brush
-- ring and image shadows
+- lasso brush
 - ...

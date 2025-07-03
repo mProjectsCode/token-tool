@@ -15,15 +15,11 @@ export interface ImageDimensions {
 
 export type ImageWorkerRPCHandlersWorker = {
 	initialize: [];
-	render: [Uint8Array, ImageDimensions, ImageTransform, boolean];
-	clearMask: [ImageDimensions];
-	setMask: [Uint8Array, ImageDimensions];
-	drawOnMask: [number, boolean, number, number];
+	render: [Uint8Array, Uint8Array | undefined, ImageDimensions, ImageTransform, boolean];
 };
 
 export type ImageWorkerRPCHandlersMain = {
 	onRenderFinished: [Uint8Array];
-	onMaskUpdated: [Uint8Array | undefined];
 	onInitialized: [];
 	log: [string];
 };
