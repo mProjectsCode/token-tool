@@ -6,6 +6,7 @@ import type {
 } from './imageWorkerRPC';
 import { RPCController } from '../RPC';
 import ImageWorker from './imageWorker?worker';
+import type { PreviewImageHolder } from './previewImageHolder.svelte';
 
 interface RenderTask {
 	type: 'render';
@@ -14,7 +15,7 @@ interface RenderTask {
 	dims: ImageDimensions;
 	state: ImageTransform;
 	ring: boolean;
-	img: HTMLImageElement;
+	img: PreviewImageHolder;
 }
 
 type Task = RenderTask;
@@ -42,7 +43,7 @@ export class ImageProcessor {
 					return;
 				}
 
-				this.currentTask.img.src = URL.createObjectURL(new Blob([img], { type: 'image/webp' }));
+				this.currentTask.img.setImage(new Blob([img], { type: 'image/webp' }));
 				this.currentTask = null;
 				this.update();
 			},
@@ -75,7 +76,7 @@ export class ImageProcessor {
 		dims: ImageDimensions,
 		state: ImageTransform,
 		ring: boolean,
-		img: HTMLImageElement,
+		img: PreviewImageHolder,
 	): void {
 		if (!this.initialized) {
 			console.warn('Worker not initialized yet');

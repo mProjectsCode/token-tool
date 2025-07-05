@@ -169,7 +169,7 @@ impl ImageProcessor {
             &mut ring_image,
             dimension.center_tuple_i32(),
             (dimension.stencil_radius + ring_width) as i32,
-            image::Rgba([255, 255, 255, 255]),
+            image::Rgba([220, 220, 220, 255]),
         );
         imageproc::drawing::draw_filled_circle_mut(
             &mut ring_image,
@@ -187,10 +187,11 @@ impl ImageProcessor {
         mask: &DynamicImage,
         dimensions: ImageDimensions,
         invert: bool,
+        threshold: u8,
     ) -> DynamicImage {
         ImageBuffer::from_fn(dimensions.size, dimensions.size, |x, y| {
             let mask_pixel = mask.get_pixel(x, y);
-            if (mask_pixel[3] > 0) ^ invert {
+            if (mask_pixel[3] > threshold) ^ invert {
                 // Check alpha channel
                 image.get_pixel(x, y)
             } else {
@@ -203,7 +204,7 @@ impl ImageProcessor {
     pub fn to_shadow(&self, image: &DynamicImage, dimensions: ImageDimensions) -> DynamicImage {
         let image = ImageBuffer::from_fn(dimensions.size, dimensions.size, |x, y| {
             let pixel = image.get_pixel(x, y);
-            image::Rgba([0, 0, 0, pixel[3]])
+            image::Rgba([0, 0, 0, (pixel[3] as f32 * 0.5) as u8])
         });
 
         imageops::blur(&image, 15.0).into()
@@ -216,6 +217,8 @@ impl ImageProcessor {
         dimensions: ImageDimensions,
         ring: bool,
     ) -> DynamicImage {
+        let stencil = self.create_stencil(dimensions);
+        let inverted_stencil = self.create_inverted_stencil(dimensions);
         let mut composite_image = create_blank_image(dimensions);
 
         if ring {
@@ -223,20 +226,21 @@ impl ImageProcessor {
             imageops::overlay(&mut composite_image, &ring_image, 0, 0);
         }
 
-        let stenciled_image_shadow = self.stencil(image, mask, dimensions, false);
+        let stenciled_image_shadow = self.stencil(image, mask, dimensions, false, 0);
         let image_shadow = self.to_shadow(&stenciled_image_shadow, dimensions);
+        let image_shadow = self.stencil(&image_shadow, &inverted_stencil, dimensions, false, 0);
 
         imageops::overlay(&mut composite_image, &image_shadow, 0, 0);
 
-        let stencil = self.create_stencil(dimensions);
-        let inverted_stencil = self.create_inverted_stencil(dimensions);
-        let masked_inverted_stencil = self.stencil(&inverted_stencil, mask, dimensions, true);
-        let ring_shadow = self.to_shadow(&masked_inverted_stencil, dimensions);
-        // TODO: maybe mask the ring shadow only to the image without the stencil and mask?
-        let stenciled_ring_shadow = self.stencil(&ring_shadow, &stencil, dimensions, false);
-        let stenciled_ring_shadow = self.stencil(&stenciled_ring_shadow, mask, dimensions, true);
-
         let masked_and_stenciled_image = self.mask_and_stencil_image(image, mask, dimensions);
+
+
+        let masked_inverted_stencil = self.stencil(&inverted_stencil, mask, dimensions, true, 0);
+        let ring_shadow = self.to_shadow(&masked_inverted_stencil, dimensions);
+        let stenciled_ring_shadow = self.stencil(&ring_shadow, &stencil, dimensions, false, 0);
+        let stenciled_ring_shadow = self.stencil(&stenciled_ring_shadow, mask, dimensions, true, 0);
+        let stenciled_ring_shadow = self.stencil(&stenciled_ring_shadow, &masked_and_stenciled_image, dimensions, false, 10);
+
         imageops::overlay(&mut composite_image, &masked_and_stenciled_image, 0, 0);
         imageops::overlay(&mut composite_image, &stenciled_ring_shadow, 0, 0);
 

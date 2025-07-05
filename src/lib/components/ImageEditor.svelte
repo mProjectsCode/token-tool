@@ -21,6 +21,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import type { Paintable } from 'src/helpers/paintable/paintable';
 	import PaintableCanvas from './PaintableCanvas.svelte';
+	import { PreviewImageHolder } from '../../helpers/image/previewImageHolder.svelte';
 
 	interface LoadedImage {
 		name: string;
@@ -87,7 +88,7 @@
 	let brushSize = $state<number>(40);
 	let editMode = $state<EditMode>(EditMode.Positioning);
 
-	let previewImg = $state<HTMLImageElement | undefined>(undefined);
+	let previewImgHolder = $state<PreviewImageHolder>(new PreviewImageHolder());
 	let canvasWrapper = $state<HTMLDivElement | undefined>(undefined);
 	let fileInput = $state<HTMLInputElement | null>();
 
@@ -225,6 +226,7 @@
 	}
 
 	function handleCanvasMouseOut(event: MouseEvent) {
+		dragState = null;
 		mouseInCanvas = false;
 	}
 
@@ -392,60 +394,66 @@
 		<Card.Header>
 			<Card.Title>Editor Controls</Card.Title>
 		</Card.Header>
-		<Card.Content>
+		<Card.Content class="flex h-full flex-col">
 			{#if activeImage}
-				<div class="grid grid-cols-2 gap-4">
-					<Label>Token size</Label>
-					<Select.Root type="single" bind:value={activeImage.size}>
-						<Select.Trigger class="w-full">{activeImage.size}</Select.Trigger>
-						<Select.Content>
-							{#each Object.values(CreatureSize) as size}
-								<Select.Item value={size}>{size}</Select.Item>
-							{/each}
-						</Select.Content>
-					</Select.Root>
+				<div class="flex-1">
+					<div class="grid grid-cols-2 gap-4">
+						<Label>Token size</Label>
+						<Select.Root type="single" bind:value={activeImage.size}>
+							<Select.Trigger class="w-full">{activeImage.size}</Select.Trigger>
+							<Select.Content>
+								{#each Object.values(CreatureSize) as size}
+									<Select.Item value={size}>{size}</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
 
-					<Label>Oversized token</Label>
-					<Checkbox bind:checked={activeImage.oversized} />
+						<Label>Oversized token</Label>
+						<Checkbox bind:checked={activeImage.oversized} />
 
-					<!-- Scale -->
-					<Label>Scale</Label>
-					<div>
-						<Button onclick={() => zoomOut()}>-</Button>
-						{Math.round(activeImage.transform.scale * 100)}%
-						<Button onclick={() => zoomIn()}>+</Button>
+						<!-- Scale -->
+						<Label>Scale</Label>
+						<div>
+							<Button onclick={() => zoomOut()}>-</Button>
+							{Math.round(activeImage.transform.scale * 100)}%
+							<Button onclick={() => zoomIn()}>+</Button>
+						</div>
+
+						<!-- Positioning -->
+						<Label>Position X</Label>
+						<Input type="number" min="-1000" max="1000" bind:value={activeImage.transform.posX} />
+						<Label>Position Y</Label>
+						<Input type="number" min="-1000" max="1000" bind:value={activeImage.transform.posY} />
+
+						<!-- Painting -->
+						<Label>Paint size</Label>
+						<Slider type="single" min={10} max={dimensions.size / 2} bind:value={brushSize}></Slider>
 					</div>
-
-					<!-- Positioning -->
-					<Label>Position X</Label>
-					<Input type="number" min="-1000" max="1000" bind:value={activeImage.transform.posX} />
-					<Label>Position Y</Label>
-					<Input type="number" min="-1000" max="1000" bind:value={activeImage.transform.posY} />
-
-					<!-- Painting -->
-					<Label>Paint size</Label>
-					<Slider type="single" min={10} max={dimensions.size / 2} bind:value={brushSize}></Slider>
-
+				</div>
+				<div class="mt-4 grid grid-cols-2 gap-4">
 					<Dialog.Root
 						onOpenChange={async open => {
 							await tick();
-							if (open && activeImage && previewImg) {
+							if (open && activeImage) {
 								console.log(`Rendering preview for ${activeImage.name}`);
 
 								saveMask();
 
+								previewImgHolder.clearImage();
 								imageProcessor.render(
 									activeImage.data,
 									activeImage.mask ? new Uint8Array(activeImage.mask.data) : undefined,
 									$state.snapshot(dimensions),
 									$state.snapshot(activeImage.transform),
 									true,
-									previewImg,
+									previewImgHolder,
 								);
 							}
 						}}
 					>
-						<Dialog.Trigger>Preview</Dialog.Trigger>
+						<Dialog.Trigger>
+							<Button variant="outline" class="w-full">Preview</Button>
+						</Dialog.Trigger>
 						<Dialog.Content class="w-3xl max-w-3xl sm:max-w-3xl">
 							<Dialog.Header>
 								<Dialog.Title>Preview</Dialog.Title>
@@ -453,9 +461,50 @@
 									A preview of your token with a simple white border and dark background.
 								</Dialog.Description>
 							</Dialog.Header>
-							<img bind:this={previewImg} alt="Preview" class="border border-gray-300" />
+							<div class="max-h-[80vh] overflow-auto">
+								{#if previewImgHolder.image}
+									<img
+										src={previewImgHolder.image}
+										alt="Preview"
+										class="aspect-square w-full border"
+									/>
+									<img
+										src={previewImgHolder.image}
+										alt="Preview"
+										class="aspect-square w-full border bg-white"
+									/>
+								{:else}
+									<span class="text-muted-foreground">Rendering preview...</span>
+								{/if}
+							</div>
 						</Dialog.Content>
 					</Dialog.Root>
+
+					{#if (activeImageIndex ?? 0) < loadedImages.length - 1}
+						<Button
+							variant="outline"
+							class="w-full"
+							onclick={() => {
+								if (activeImageIndex !== undefined && activeImageIndex < loadedImages.length - 1) {
+									setActiveImage(activeImageIndex + 1);
+								} else {
+									console.warn('No next image to edit');
+								}
+							}}
+						>
+							Next
+						</Button>
+					{:else}
+						<Button
+							variant="outline"
+							class="w-full"
+							onclick={() => {
+								console.warn('Export not implemented yet');
+							}}
+						>
+							Export
+						</Button>
+					{/if}
 				</div>
 			{:else}
 				<p>No image selected for editing.</p>
