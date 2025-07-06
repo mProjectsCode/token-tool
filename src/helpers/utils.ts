@@ -1,4 +1,4 @@
-import type { ImageDimensions } from './image/imageWorkerRPC';
+import type { ImageDimensions, ImageTransform } from './image/imageWorkerRPC';
 
 export async function readFileAsArrayBuffer(file: File): Promise<Uint8Array> {
 	return new Promise((resolve, reject) => {
@@ -105,4 +105,14 @@ export class Throttle<F extends (...args: any[]) => void> {
 
 		this.lastArgs = args;
 	}
+}
+
+export interface LoadedImage {
+	name: string;
+	data: Uint8Array;
+	mask: ImageData | undefined;
+	size: CreatureSize;
+	oversized: boolean;
+	transform: ImageTransform;
+	completed: boolean;
 }

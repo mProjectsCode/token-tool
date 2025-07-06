@@ -20,6 +20,7 @@ export type ImageWorkerRPCHandlersWorker = {
 
 export type ImageWorkerRPCHandlersMain = {
 	onRenderFinished: [Uint8Array];
+	onRenderError: [string];
 	onInitialized: [];
 	log: [string];
 };

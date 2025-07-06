@@ -6,31 +6,24 @@
 		readFileAsArrayBuffer,
 		remapRange,
 		Throttle,
-	} from '../../helpers/utils';
+		type LoadedImage,
+	} from 'src/helpers/utils';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { ImageProcessor } from '../../helpers/image/imageProcessor';
+	import { ImageProcessor } from 'src/helpers/image/imageProcessor';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { tick, untrack } from 'svelte';
 	import { Slider } from '$lib/components/ui/slider/index.js';
-	import type { ImageTransform } from 'src/helpers/image/imageWorkerRPC';
-	import { Paintbrush, Scaling } from '@lucide/svelte';
+	import { Check, Paintbrush, Scaling } from '@lucide/svelte';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import type { Paintable } from 'src/helpers/paintable/paintable';
-	import PaintableCanvas from './PaintableCanvas.svelte';
-	import { PreviewImageHolder } from '../../helpers/image/previewImageHolder.svelte';
-
-	interface LoadedImage {
-		name: string;
-		data: Uint8Array;
-		mask: ImageData | undefined;
-		size: CreatureSize;
-		oversized: boolean;
-		transform: ImageTransform;
-	}
+	import PaintableCanvas from '$lib/components/PaintableCanvas.svelte';
+	import { PreviewImageHolder } from 'src/helpers/image/previewImageHolder.svelte';
+	import LoadedImageCard from './LoadedImageCard.svelte';
+	import ImageExport from './ImageExport.svelte';
 
 	interface DragState {
 		startX: number;
@@ -69,6 +62,7 @@
 						posY: 0,
 						flipped: false,
 					},
+					completed: false,
 				} satisfies LoadedImage;
 			}),
 		);
@@ -80,6 +74,7 @@
 	let activeImage = $derived<LoadedImage | undefined>(
 		activeImageIndex !== undefined ? loadedImages[activeImageIndex] : undefined,
 	);
+	let allCompleted = $derived(loadedImages.length > 0 && loadedImages.every(image => image.completed));
 	let dimensions = $derived(
 		activeImage
 			? getImageDimensions(activeImage.size, activeImage.oversized)
@@ -91,6 +86,7 @@
 	let previewImgHolder = $state<PreviewImageHolder>(new PreviewImageHolder());
 	let canvasWrapper = $state<HTMLDivElement | undefined>(undefined);
 	let fileInput = $state<HTMLInputElement | null>();
+	let exportDialogOpen = $state<boolean>(false);
 
 	let paintable = $state<Paintable | undefined>(undefined);
 	let canvasSize = $state<number>(0);
@@ -275,14 +271,19 @@
 
 		activeImage.mask = paintable.getImageData();
 	}
+
+	function openExportDialog() {
+		saveMask();
+		exportDialogOpen = true;
+	}
 </script>
 
 <div class="flex h-screen max-h-screen flex-row items-stretch justify-center p-4">
-	<Card.Root class="max-w-fit min-w-fit">
+	<Card.Root class=" min-w-fit">
 		<Card.Header>
 			<Card.Title>Image Selection</Card.Title>
 		</Card.Header>
-		<Card.Content class="flex min-h-0 flex-1 flex-col gap-2">
+		<Card.Content class="flex min-h-0 w-80 max-w-80 flex-1 flex-col gap-2">
 			<Input
 				bind:ref={fileInput}
 				class="bg-primary! text-primary-foreground hover:bg-primary/90! focus-visible:border-ring focus-visible:ring-ring/50 rounded-md border-none text-sm font-medium transition-all outline-none"
@@ -293,43 +294,35 @@
 				onchange={() => loadImages()}
 			/>
 
-			{#if loadedImages.length > 0}
-				<div class="min-h-0 flex-1 overflow-auto">
-					{#if loadedImages.length > 0}
-						{#each loadedImages as image, index}
-							<!-- svelte-ignore a11y_click_events_have_key_events -->
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
-								class={'hover:border-primary mb-2 flex cursor-pointer flex-col items-center justify-center rounded border-2 p-2 ' +
-									(activeImage?.name === image.name ? 'border-primary' : '')}
-								onclick={() => setActiveImage(index)}
-							>
-								<img
-									class="center"
-									src={URL.createObjectURL(new Blob([image.data]))}
-									alt={image.name}
-									style="max-width: 200px; max-height: 200px;"
-								/>
-								<span class="text-muted-foreground">{image.name}</span>
-							</div>
-						{/each}
-					{:else}
-						<p class="text-muted-foreground">No images loaded.</p>
-					{/if}
-				</div>
-			{/if}
+			<div class="flex min-h-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto">
+				{#each loadedImages as image, index}
+					<LoadedImageCard
+						active={activeImageIndex === index}
+						image={image}
+						onclick={() => setActiveImage(index)}
+					></LoadedImageCard>
+				{/each}
+			</div>
+
+			<Button
+				variant={allCompleted ? 'default' : 'outline'}
+				onclick={() => openExportDialog()}
+				disabled={loadedImages.length === 0}
+			>
+				Export Tokens
+			</Button>
 		</Card.Content>
 	</Card.Root>
 	<div class="flex flex-3/5 items-center justify-center p-4">
 		<div class="relative aspect-square w-full max-w-[80vh]">
 			<div class="visible absolute -top-4 left-1/2 -translate-x-1/2 -translate-y-full transform">
 				<Button
-					onclick={() => (editMode = EditMode.Positioning)}
-					class={editMode === EditMode.Positioning ? '' : 'bg-secondary'}><Scaling /></Button
+					variant={editMode === EditMode.Positioning ? 'default' : 'secondary'}
+					onclick={() => (editMode = EditMode.Positioning)}><Scaling /></Button
 				>
 				<Button
-					onclick={() => (editMode = EditMode.Painting)}
-					class={editMode === EditMode.Painting ? '' : 'bg-secondary'}><Paintbrush /></Button
+					variant={editMode === EditMode.Painting ? 'default' : 'secondary'}
+					onclick={() => (editMode = EditMode.Painting)}><Paintbrush /></Button
 				>
 			</div>
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -421,16 +414,16 @@
 
 						<!-- Positioning -->
 						<Label>Position X</Label>
-						<Input type="number" min="-1000" max="1000" bind:value={activeImage.transform.posX} />
+						<Input type="number" bind:value={activeImage.transform.posX} />
 						<Label>Position Y</Label>
-						<Input type="number" min="-1000" max="1000" bind:value={activeImage.transform.posY} />
+						<Input type="number" bind:value={activeImage.transform.posY} />
 
 						<!-- Painting -->
 						<Label>Paint size</Label>
 						<Slider type="single" min={10} max={dimensions.size / 2} bind:value={brushSize}></Slider>
 					</div>
 				</div>
-				<div class="mt-4 grid grid-cols-2 gap-4">
+				<div class="mt-4 grid grid-cols-2 gap-2">
 					<Dialog.Root
 						onOpenChange={async open => {
 							await tick();
@@ -446,7 +439,7 @@
 									$state.snapshot(dimensions),
 									$state.snapshot(activeImage.transform),
 									true,
-									previewImgHolder,
+									img => previewImgHolder.setImage(new Blob([img], { type: 'image/webp' })),
 								);
 							}
 						}}
@@ -480,29 +473,28 @@
 						</Dialog.Content>
 					</Dialog.Root>
 
-					{#if (activeImageIndex ?? 0) < loadedImages.length - 1}
+					{#if activeImage.completed}
 						<Button
 							variant="outline"
 							class="w-full"
 							onclick={() => {
-								if (activeImageIndex !== undefined && activeImageIndex < loadedImages.length - 1) {
-									setActiveImage(activeImageIndex + 1);
-								} else {
-									console.warn('No next image to edit');
-								}
+								activeImage.completed = false;
 							}}
 						>
-							Next
+							Mark Uncomplete
 						</Button>
 					{:else}
 						<Button
-							variant="outline"
+							variant="default"
 							class="w-full"
 							onclick={() => {
-								console.warn('Export not implemented yet');
+								activeImage.completed = true;
+								if (activeImageIndex !== undefined && activeImageIndex < loadedImages.length - 1) {
+									setActiveImage(activeImageIndex + 1);
+								}
 							}}
 						>
-							Export
+							Mark Complete
 						</Button>
 					{/if}
 				</div>
@@ -512,3 +504,5 @@
 		</Card.Content>
 	</Card.Root>
 </div>
+
+<ImageExport bind:open={exportDialogOpen} bind:images={loadedImages} imageProcessor={imageProcessor}></ImageExport>

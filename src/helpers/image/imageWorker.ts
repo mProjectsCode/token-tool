@@ -36,9 +36,12 @@ const RPC = new RPCController<ImageWorkerRPCHandlersWorker, ImageWorkerRPCHandle
 			const transform = new IT(state.posX, state.posY, state.scale, state.flipped);
 			const dims = convertDimensions(dimensions);
 
-			const img = imageProcessor!.render(data, mask, dims, transform, ring);
-
-			RPC.call('onRenderFinished', undefined, img);
+			try {
+				const img = imageProcessor!.render(data, mask, dims, transform, ring);
+				RPC.call('onRenderFinished', undefined, img);
+			} catch (error) {
+				RPC.call('onRenderError', undefined, error instanceof Error ? error.message : String(error));
+			}
 		},
 	},
 	m => postMessage(m),

@@ -1,21 +1,19 @@
 export class PreviewImageHolder {
-    image: string | null = $state(null);
+	image: string | null = $state(null);
 
-    constructor() {
+	constructor() {}
 
-    }
+	setImage(img: Blob): void {
+		if (this.image) {
+			URL.revokeObjectURL(this.image);
+		}
+		this.image = URL.createObjectURL(img);
+	}
 
-    setImage(img: Blob): void {
-        if (this.image) {
-            URL.revokeObjectURL(this.image);
-        }
-        this.image = URL.createObjectURL(img);
-    }
-
-    clearImage(): void {
-        if (this.image) {
-            URL.revokeObjectURL(this.image);
-            this.image = null;
-        }
-    }
+	clearImage(): void {
+		if (this.image) {
+			URL.revokeObjectURL(this.image);
+			this.image = null;
+		}
+	}
 }

@@ -15,7 +15,7 @@ interface RenderTask {
 	dims: ImageDimensions;
 	state: ImageTransform;
 	ring: boolean;
-	img: PreviewImageHolder;
+	cb: (img: Uint8Array | string) => void;
 }
 
 type Task = RenderTask;
@@ -43,7 +43,18 @@ export class ImageProcessor {
 					return;
 				}
 
-				this.currentTask.img.setImage(new Blob([img], { type: 'image/webp' }));
+				this.currentTask.cb(img);
+				this.currentTask = null;
+				this.update();
+			},
+			onRenderError: msg => {
+				console.log('Render error:', msg);
+				if (!this.currentTask || this.currentTask.type !== 'render') {
+					console.error('No current task to finish or task type mismatch');
+					return;
+				}
+
+				this.currentTask.cb(msg);
 				this.currentTask = null;
 				this.update();
 			},
@@ -76,15 +87,62 @@ export class ImageProcessor {
 		dims: ImageDimensions,
 		state: ImageTransform,
 		ring: boolean,
-		img: PreviewImageHolder,
+		cb: (img: Uint8Array) => void,
 	): void {
 		if (!this.initialized) {
 			console.warn('Worker not initialized yet');
 			return;
 		}
 
-		this.queue.push({ type: 'render', data, mask, dims, state, ring, img });
+		this.queue.push({
+			type: 'render',
+			data,
+			mask,
+			dims,
+			state,
+			ring,
+			cb: img => {
+				if (typeof img === 'string') {
+					throw new Error(`Image rendering error: ${img}`);
+				} else {
+					cb(img);
+				}
+			},
+		});
 
 		this.update();
+	}
+
+	async asyncRender(
+		data: Uint8Array,
+		mask: Uint8Array | undefined,
+		dims: ImageDimensions,
+		state: ImageTransform,
+		ring: boolean,
+	): Promise<Uint8Array> {
+		return new Promise((resolve, reject) => {
+			if (!this.initialized) {
+				console.warn('Worker not initialized yet');
+				return;
+			}
+
+			this.queue.push({
+				type: 'render',
+				data,
+				mask,
+				dims,
+				state,
+				ring,
+				cb: img => {
+					if (typeof img === 'string') {
+						reject(new Error(`Image rendering error: ${img}`));
+					} else {
+						resolve(img);
+					}
+				},
+			});
+
+			this.update();
+		});
 	}
 }
