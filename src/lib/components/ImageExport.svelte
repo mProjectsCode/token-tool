@@ -159,7 +159,10 @@
 				<div class="flex flex-col gap-2">
 					<Progress value={(completedRenders / selectedImages.length) * 100} />
 					{#if zipUrl}
-						<span>Export completed!</span>
+						<span
+							>Export completed! A <code>.zip</code> should have downloaded automatically.
+							<a href={zipUrl}>If not, you can click here to retry the download.</a></span
+						>
 					{:else}
 						<span>Exporting {completedRenders} / {selectedImages.length} images...</span>
 					{/if}
@@ -170,8 +173,7 @@
 					{/if}
 				</div>
 				{#if zipUrl}
-					<div class="flex flex-row gap-2">
-						<a href={zipUrl}>Download again</a>
+					<div class="flex flex-row-reverse gap-2">
 						<Button variant="default" onclick={() => (mode = 'select')}>Back to selection</Button>
 					</div>
 				{/if}

@@ -281,7 +281,7 @@
 <div class="flex h-screen max-h-screen flex-row items-stretch justify-center p-4">
 	<Card.Root class=" min-w-fit">
 		<Card.Header>
-			<Card.Title>Image Selection</Card.Title>
+			<Card.Title>Image selection</Card.Title>
 		</Card.Header>
 		<Card.Content class="flex min-h-0 w-80 max-w-80 flex-1 flex-col gap-2">
 			<Input
@@ -309,7 +309,7 @@
 				onclick={() => openExportDialog()}
 				disabled={loadedImages.length === 0}
 			>
-				Export Tokens
+				Export tokens
 			</Button>
 		</Card.Content>
 	</Card.Root>
@@ -385,7 +385,7 @@
 	</div>
 	<Card.Root class="min-w-[400px] flex-1/5">
 		<Card.Header>
-			<Card.Title>Editor Controls</Card.Title>
+			<Card.Title>Editor controls</Card.Title>
 		</Card.Header>
 		<Card.Content class="flex h-full flex-col">
 			{#if activeImage}
@@ -419,7 +419,7 @@
 						<Input type="number" bind:value={activeImage.transform.posY} />
 
 						<!-- Painting -->
-						<Label>Paint size</Label>
+						<Label>Brush size</Label>
 						<Slider type="single" min={10} max={dimensions.size / 2} bind:value={brushSize}></Slider>
 					</div>
 				</div>
@@ -481,7 +481,7 @@
 								activeImage.completed = false;
 							}}
 						>
-							Mark Uncomplete
+							Mark uncomplete
 						</Button>
 					{:else}
 						<Button
@@ -494,7 +494,7 @@
 								}
 							}}
 						>
-							Mark Complete
+							Mark complete
 						</Button>
 					{/if}
 				</div>

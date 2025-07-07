@@ -234,12 +234,17 @@ impl ImageProcessor {
 
         let masked_and_stenciled_image = self.mask_and_stencil_image(image, mask, dimensions);
 
-
         let masked_inverted_stencil = self.stencil(&inverted_stencil, mask, dimensions, true, 0);
         let ring_shadow = self.to_shadow(&masked_inverted_stencil, dimensions);
         let stenciled_ring_shadow = self.stencil(&ring_shadow, &stencil, dimensions, false, 0);
         let stenciled_ring_shadow = self.stencil(&stenciled_ring_shadow, mask, dimensions, true, 0);
-        let stenciled_ring_shadow = self.stencil(&stenciled_ring_shadow, &masked_and_stenciled_image, dimensions, false, 10);
+        let stenciled_ring_shadow = self.stencil(
+            &stenciled_ring_shadow,
+            &masked_and_stenciled_image,
+            dimensions,
+            false,
+            10,
+        );
 
         imageops::overlay(&mut composite_image, &masked_and_stenciled_image, 0, 0);
         imageops::overlay(&mut composite_image, &stenciled_ring_shadow, 0, 0);
