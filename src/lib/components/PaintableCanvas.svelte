@@ -18,7 +18,7 @@
 			console.error('Missing canvas element.');
 			return;
 		}
-		paintable = new Paintable(canvas, dimensions);
+		paintable = new Paintable(canvas, dimensions, 'lime');
 	});
 
 	$effect(() => {

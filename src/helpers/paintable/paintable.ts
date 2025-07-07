@@ -3,9 +3,11 @@ import type { ImageDimensions } from '../image/imageWorkerRPC';
 export class Paintable {
 	private canvas: HTMLCanvasElement;
 	private ctx: CanvasRenderingContext2D;
+	private fillStyle: string;
 
-	constructor(element: HTMLCanvasElement, dimensions: ImageDimensions) {
+	constructor(element: HTMLCanvasElement, dimensions: ImageDimensions, fillStyle: string = 'white') {
 		this.canvas = element;
+		this.fillStyle = fillStyle;
 		const ctx = this.canvas.getContext('2d');
 		if (!ctx) {
 			throw new Error('Failed to get 2D context from canvas');
@@ -41,7 +43,7 @@ export class Paintable {
 			this.ctx.globalCompositeOperation = 'source-over';
 		}
 		this.ctx.arc(x, y, diameter / 2, 0, Math.PI * 2);
-		this.ctx.fillStyle = 'white';
+		this.ctx.fillStyle = this.fillStyle;
 		this.ctx.fill();
 		this.ctx.closePath();
 	}
