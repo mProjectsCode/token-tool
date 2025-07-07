@@ -7,6 +7,7 @@ import path from 'path';
 
 // https://vite.dev/config/
 export default defineConfig({
+	base: '/token-tool/',
 	plugins: [tailwindcss(), svelte(), wasm(), topLevelAwait()],
 	resolve: {
 		alias: {
