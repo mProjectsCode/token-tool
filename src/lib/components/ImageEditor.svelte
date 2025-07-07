@@ -250,8 +250,8 @@
 		if (!activeImage) return;
 
 		activeImage.transform.scale += activeImage.transform.scale * 0.1;
-		if (activeImage.transform.scale > 10) {
-			activeImage.transform.scale = 10; // Limit max scale
+		if (activeImage.transform.scale > 100) {
+			activeImage.transform.scale = 100; // Limit max scale
 		}
 	}
 
@@ -259,8 +259,8 @@
 		if (!activeImage) return;
 
 		activeImage.transform.scale -= activeImage.transform.scale * 0.1;
-		if (activeImage.transform.scale < 0.1) {
-			activeImage.transform.scale = 0.1; // Limit min scale
+		if (activeImage.transform.scale < 0.01) {
+			activeImage.transform.scale = 0.01; // Limit min scale
 		}
 	}
 
@@ -289,7 +289,7 @@
 				class="bg-primary! text-primary-foreground hover:bg-primary/90! focus-visible:border-ring focus-visible:ring-ring/50 rounded-md border-none text-sm font-medium transition-all outline-none"
 				id="picture"
 				type="file"
-				accept="image/*"
+				accept="image/jpeg,image/png,image/webp"
 				multiple
 				onchange={() => loadImages()}
 			/>
