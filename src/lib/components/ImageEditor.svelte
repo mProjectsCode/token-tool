@@ -315,7 +315,7 @@
 	</Card.Root>
 	<div class="flex flex-3/5 items-center justify-center p-4">
 		<div class="relative aspect-square w-full max-w-[80vh]">
-			<div class="visible absolute -top-4 left-1/2 -translate-x-1/2 -translate-y-full transform">
+			<div class="absolute -top-4 left-1/2 -translate-x-1/2 -translate-y-full transform">
 				<Button
 					variant={editMode === EditMode.Positioning ? 'default' : 'secondary'}
 					onclick={() => (editMode = EditMode.Positioning)}><Scaling /></Button
@@ -324,6 +324,9 @@
 					variant={editMode === EditMode.Painting ? 'default' : 'secondary'}
 					onclick={() => (editMode = EditMode.Painting)}><Paintbrush /></Button
 				>
+			</div>
+			<div class="absolute -bottom-8 left-1/2 -translate-x-1/2 translate-y-full transform w-full">
+				<a class="block w-full text-center" href="https://github.com/mProjectsCode/token-tool/issues" target="_blank">Work in progress. Please report feedback and issues here.</a>
 			</div>
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->

@@ -2,11 +2,11 @@
 
 A WIP tool to turn background free images into usable images for Foundrys Dynamic Token Rings.
 
-It's kind of usable now, but not deployed anywhere yet, so you have to run it locally for now.
+https://www.moritzjung.dev/token-tool/
 
 ## TODO
 
-- good UI
+- better UI
 - editor zoom
 - lasso brush
 - ...
