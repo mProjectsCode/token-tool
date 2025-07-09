@@ -2,6 +2,7 @@ use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba, imageops};
 
 use crate::{create_blank_image, image_options::ImageDimensions};
 
+#[allow(dead_code)]
 pub trait ImageStencil {
     fn to_stencil<'a>(&'a self, threshold: u8) -> StencilMask<'a>;
     fn to_inverted_stencil<'a>(&'a self, threshold: u8) -> StencilMask<'a>;
