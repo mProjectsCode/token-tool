@@ -1,3 +1,6 @@
+mod image_options;
+mod image_shadow;
+mod image_stencil;
 mod utils;
 
 use std::io::Cursor;
@@ -6,7 +9,12 @@ use image::{DynamicImage, GenericImageView, ImageBuffer, ImageReader, Rgba, imag
 use imageproc::rect::Rect;
 use wasm_bindgen::prelude::*;
 
-use crate::utils::set_panic_hook;
+use crate::{
+    image_options::{ImageDimensions, ImageTransform},
+    image_shadow::{ImageShadow, ShadowOptions},
+    image_stencil::{ImageStencil, overlay_images},
+    utils::set_panic_hook,
+};
 
 fn create_blank_image(dimensions: ImageDimensions) -> DynamicImage {
     let blank_image = image::ImageBuffer::new(dimensions.size, dimensions.size);
@@ -22,63 +30,6 @@ fn image_to_bytes(image: &DynamicImage) -> Result<Vec<u8>, JsValue> {
         )
         .map_err(|e| JsValue::from_str(&format!("Failed to write image: {e}")))?;
     Ok(bytes)
-}
-
-#[wasm_bindgen]
-pub struct ImageTransform {
-    pos_x: i32,
-    pos_y: i32,
-    scale: f32,
-    flipped: bool,
-}
-
-#[wasm_bindgen]
-impl ImageTransform {
-    #[wasm_bindgen(constructor)]
-    pub fn new(pos_x: i32, pos_y: i32, scale: f32, flipped: bool) -> Self {
-        ImageTransform {
-            pos_x,
-            pos_y,
-            scale,
-            flipped,
-        }
-    }
-}
-
-#[wasm_bindgen]
-#[derive(Debug, Clone, Copy)]
-pub struct ImageDimensions {
-    size: u32,
-    stencil_radius: u32,
-}
-
-#[wasm_bindgen]
-impl ImageDimensions {
-    #[wasm_bindgen(constructor)]
-    pub fn new(size: u32, stencil_radius: u32) -> Self {
-        ImageDimensions {
-            size,
-            stencil_radius,
-        }
-    }
-}
-
-impl ImageDimensions {
-    pub fn center(&self) -> u32 {
-        self.size / 2
-    }
-
-    pub fn center_tuple(&self) -> (u32, u32) {
-        (self.center(), self.center())
-    }
-
-    pub fn center_i32(&self) -> i32 {
-        self.size as i32 / 2
-    }
-
-    pub fn center_tuple_i32(&self) -> (i32, i32) {
-        (self.center_i32(), self.center_i32())
-    }
 }
 
 #[wasm_bindgen]
@@ -181,35 +132,9 @@ impl ImageProcessor {
         ring_image
     }
 
-    pub fn stencil(
-        &self,
-        image: &DynamicImage,
-        mask: &DynamicImage,
-        dimensions: ImageDimensions,
-        invert: bool,
-        threshold: u8,
-    ) -> DynamicImage {
-        ImageBuffer::from_fn(dimensions.size, dimensions.size, |x, y| {
-            let mask_pixel = mask.get_pixel(x, y);
-            if (mask_pixel[3] > threshold) ^ invert {
-                // Check alpha channel
-                image.get_pixel(x, y)
-            } else {
-                image::Rgba([0, 0, 0, 0]) // Transparent pixel
-            }
-        })
-        .into()
-    }
-
-    pub fn to_shadow(&self, image: &DynamicImage, dimensions: ImageDimensions) -> DynamicImage {
-        let image = ImageBuffer::from_fn(dimensions.size, dimensions.size, |x, y| {
-            let pixel = image.get_pixel(x, y);
-            image::Rgba([0, 0, 0, (pixel[3] as f32 * 0.5) as u8])
-        });
-
-        imageops::blur(&image, 15.0).into()
-    }
-
+    /// Build the final composite image with shadows and all.
+    /// Assumes that all the images are already resized to the correct
+    /// dimensions.
     pub fn build_image(
         &self,
         image: &DynamicImage,
@@ -217,39 +142,45 @@ impl ImageProcessor {
         dimensions: ImageDimensions,
         ring: bool,
     ) -> DynamicImage {
-        let stencil = self.create_stencil(dimensions);
-        let inverted_stencil = self.create_inverted_stencil(dimensions);
-        let mut composite_image = create_blank_image(dimensions);
+        let circle_mask = self.create_stencil(dimensions);
+        let circle_mask_inverted = self.create_inverted_stencil(dimensions);
+        // circle mask that only keeps the center circle
+        let circle_stencil = circle_mask.to_stencil(0);
+        // inverted circle mask that keeps everything outside the center circle
+        // let circle_stencil_inverted = circle_mask.to_inverted_stencil(0);
 
-        if ring {
-            let ring_image = self.create_ring_image(dimensions, 20);
-            imageops::overlay(&mut composite_image, &ring_image, 0, 0);
-        }
+        let mask_stencil = mask.to_stencil(0);
+        let mask_stencil_inverted = mask.to_inverted_stencil(0);
+        let masked_image = image.stencil(&mask_stencil);
+        let masked_image_inverted = image.stencil_and(&[&mask_stencil_inverted, &circle_stencil]);
 
-        let stenciled_image_shadow = self.stencil(image, mask, dimensions, false, 0);
-        let image_shadow = self.to_shadow(&stenciled_image_shadow, dimensions);
-        let image_shadow = self.stencil(&image_shadow, &inverted_stencil, dimensions, false, 0);
+        let ring_image = if ring {
+            self.create_ring_image(dimensions, 20)
+        } else {
+            create_blank_image(dimensions)
+        };
 
-        imageops::overlay(&mut composite_image, &image_shadow, 0, 0);
+        let image_shadow_options = ShadowOptions::new_black(0.4, 3.0, 5, 5);
+        let image_shadow = image.to_shadow(&image_shadow_options);
+        let image_shadow_mask = image_shadow.stencil(&mask_stencil);
+        let image_shadow_non_mask =
+            image_shadow.stencil_and(&[&mask_stencil_inverted, &circle_stencil]);
 
-        let masked_and_stenciled_image = self.mask_and_stencil_image(image, mask, dimensions);
+        let ring_shadow_options = ShadowOptions::new_black(0.8, 10.0, 7, 12);
+        let ring_shadow = circle_mask_inverted.to_shadow(&ring_shadow_options);
+        let stenciled_ring_shadow = ring_shadow.stencil(&circle_stencil);
 
-        let masked_inverted_stencil = self.stencil(&inverted_stencil, mask, dimensions, true, 0);
-        let ring_shadow = self.to_shadow(&masked_inverted_stencil, dimensions);
-        let stenciled_ring_shadow = self.stencil(&ring_shadow, &stencil, dimensions, false, 0);
-        let stenciled_ring_shadow = self.stencil(&stenciled_ring_shadow, mask, dimensions, true, 0);
-        let stenciled_ring_shadow = self.stencil(
-            &stenciled_ring_shadow,
-            &masked_and_stenciled_image,
+        overlay_images(
             dimensions,
-            false,
-            10,
-        );
-
-        imageops::overlay(&mut composite_image, &masked_and_stenciled_image, 0, 0);
-        imageops::overlay(&mut composite_image, &stenciled_ring_shadow, 0, 0);
-
-        composite_image
+            &[
+                &image_shadow_non_mask,
+                &masked_image_inverted,
+                &stenciled_ring_shadow,
+                &ring_image,
+                &image_shadow_mask,
+                &masked_image,
+            ],
+        )
     }
 
     pub fn mask_and_stencil_image(
