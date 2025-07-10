@@ -6,7 +6,7 @@ import type {
 } from './imageWorkerRPC';
 import { RPCController } from '../RPC';
 import ImageWorker from './imageWorker?worker';
-import type { PreviewImageHolder } from './previewImageHolder.svelte';
+import { assertType } from '../utils';
 
 interface RenderTask {
 	type: 'render';
@@ -18,7 +18,19 @@ interface RenderTask {
 	cb: (img: Uint8Array | string) => void;
 }
 
-type Task = RenderTask;
+interface LoadBorderTask {
+	type: 'loadBorder';
+	data: Uint8Array;
+	meta: string;
+	cb: (error: undefined | string) => void;
+}
+
+interface PreviewBorderTask {
+	type: 'previewBorder';
+	cb: (img: Uint8Array | string) => void;
+}
+
+type Task = RenderTask | LoadBorderTask | PreviewBorderTask;
 
 export class ImageProcessor {
 	worker: Worker;
@@ -47,10 +59,32 @@ export class ImageProcessor {
 				this.currentTask = null;
 				this.update();
 			},
-			onRenderError: msg => {
-				console.log('Render error:', msg);
-				if (!this.currentTask || this.currentTask.type !== 'render') {
+			onLoadBorderFinished: () => {
+				console.log('Load border finished');
+				if (!this.currentTask || this.currentTask.type !== 'loadBorder') {
 					console.error('No current task to finish or task type mismatch');
+					return;
+				}
+
+				this.currentTask.cb(undefined);
+				this.currentTask = null;
+				this.update();
+			},
+			onPreviewBorderFinished: img => {
+				console.log('Preview border finished');
+				if (!this.currentTask || this.currentTask.type !== 'previewBorder') {
+					console.error('No current task to finish or task type mismatch');
+					return;
+				}
+
+				this.currentTask.cb(img);
+				this.currentTask = null;
+				this.update();
+			},
+			onError: msg => {
+				console.log('Worker error:', msg);
+				if (!this.currentTask) {
+					console.error('No current task to finish');
 					return;
 				}
 
@@ -79,6 +113,15 @@ export class ImageProcessor {
 			this.RPC.call('render', undefined, task.data, task.mask, task.dims, task.state, task.ring);
 			return;
 		}
+		if (task.type === 'loadBorder') {
+			this.RPC.call('loadBorder', undefined, task.data, task.meta);
+			return;
+		}
+		if (task.type === 'previewBorder') {
+			this.RPC.call('previewBorder', undefined);
+			return;
+		}
+		assertType<never>(task);
 	}
 
 	render(
@@ -123,6 +166,7 @@ export class ImageProcessor {
 		return new Promise((resolve, reject) => {
 			if (!this.initialized) {
 				console.warn('Worker not initialized yet');
+				reject(new Error('Worker not initialized'));
 				return;
 			}
 
@@ -136,6 +180,54 @@ export class ImageProcessor {
 				cb: img => {
 					if (typeof img === 'string') {
 						reject(new Error(`Image rendering error: ${img}`));
+					} else {
+						resolve(img);
+					}
+				},
+			});
+
+			this.update();
+		});
+	}
+
+	async loadBorder(data: Uint8Array, meta: string): Promise<void> {
+		return new Promise((resolve, reject) => {
+			if (!this.initialized) {
+				console.warn('Worker not initialized yet');
+				reject(new Error('Worker not initialized'));
+				return;
+			}
+
+			this.queue.push({
+				type: 'loadBorder',
+				data,
+				meta,
+				cb: error => {
+					if (error) {
+						reject(new Error(`Border loading error: ${error}`));
+					} else {
+						resolve();
+					}
+				},
+			});
+
+			this.update();
+		});
+	}
+
+	async previewBorder(): Promise<Uint8Array> {
+		return new Promise((resolve, reject) => {
+			if (!this.initialized) {
+				console.warn('Worker not initialized yet');
+				reject(new Error('Worker not initialized'));
+				return;
+			}
+
+			this.queue.push({
+				type: 'previewBorder',
+				cb: img => {
+					if (typeof img === 'string') {
+						reject(new Error(`Border preview error: ${img}`));
 					} else {
 						resolve(img);
 					}

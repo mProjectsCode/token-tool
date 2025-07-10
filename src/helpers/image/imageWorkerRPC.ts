@@ -10,17 +10,22 @@ export interface ImageTransform {
 
 export interface ImageDimensions {
 	size: number;
+	oversized: boolean;
 	stencilRadius: number;
 }
 
 export type ImageWorkerRPCHandlersWorker = {
 	initialize: [];
 	render: [Uint8Array, Uint8Array | undefined, ImageDimensions, ImageTransform, boolean];
+	loadBorder: [Uint8Array, string];
+	previewBorder: [];
 };
 
 export type ImageWorkerRPCHandlersMain = {
 	onRenderFinished: [Uint8Array];
-	onRenderError: [string];
+	onLoadBorderFinished: [];
+	onPreviewBorderFinished: [Uint8Array];
+	onError: [string];
 	onInitialized: [];
 	log: [string];
 };

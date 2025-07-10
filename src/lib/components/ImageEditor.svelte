@@ -24,6 +24,7 @@
 	import { PreviewImageHolder } from 'src/helpers/image/previewImageHolder.svelte';
 	import LoadedImageCard from './LoadedImageCard.svelte';
 	import ImageExport from './ImageExport.svelte';
+	import TokenRing from './TokenRing.svelte';
 
 	interface DragState {
 		startX: number;
@@ -87,6 +88,7 @@
 	let canvasWrapper = $state<HTMLDivElement | undefined>(undefined);
 	let fileInput = $state<HTMLInputElement | null>();
 	let exportDialogOpen = $state<boolean>(false);
+	let tokenRingDialogOpen = $state<boolean>(false);
 
 	let paintable = $state<Paintable | undefined>(undefined);
 	let canvasSize = $state<number>(0);
@@ -276,6 +278,11 @@
 		saveMask();
 		exportDialogOpen = true;
 	}
+
+	function openTokenRingDialog() {
+		saveMask();
+		tokenRingDialogOpen = true;
+	}
 </script>
 
 <div class="flex h-screen max-h-screen flex-row items-stretch justify-center p-4">
@@ -303,6 +310,8 @@
 					></LoadedImageCard>
 				{/each}
 			</div>
+
+			<Button variant={'default'} onclick={() => openTokenRingDialog()}>Set token ring</Button>
 
 			<Button
 				variant={allCompleted ? 'default' : 'outline'}
@@ -513,3 +522,5 @@
 </div>
 
 <ImageExport bind:open={exportDialogOpen} bind:images={loadedImages} imageProcessor={imageProcessor}></ImageExport>
+
+<TokenRing bind:open={tokenRingDialogOpen} imageProcessor={imageProcessor}></TokenRing>

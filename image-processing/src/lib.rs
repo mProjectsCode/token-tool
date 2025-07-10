@@ -1,3 +1,4 @@
+mod image_border;
 mod image_options;
 mod image_shadow;
 mod image_stencil;
@@ -10,6 +11,7 @@ use imageproc::rect::Rect;
 use wasm_bindgen::prelude::*;
 
 use crate::{
+    image_border::ImageBorder,
     image_options::{ImageDimensions, ImageTransform},
     image_shadow::{ImageShadow, ShadowOptions},
     image_stencil::{ImageStencil, overlay_images},
@@ -33,7 +35,9 @@ fn image_to_bytes(image: &DynamicImage) -> Result<Vec<u8>, JsValue> {
 }
 
 #[wasm_bindgen]
-pub struct ImageProcessor {}
+pub struct ImageProcessor {
+    border: Option<ImageBorder>,
+}
 
 #[wasm_bindgen]
 impl ImageProcessor {
@@ -41,11 +45,11 @@ impl ImageProcessor {
     pub fn new() -> Result<Self, JsValue> {
         set_panic_hook();
 
-        Ok(ImageProcessor {})
+        Ok(ImageProcessor { border: None })
     }
 
     pub fn render(
-        &mut self,
+        &self,
         image_data: &[u8],
         mask_data: Option<Vec<u8>>,
         dimensions: ImageDimensions,
@@ -91,9 +95,15 @@ impl ImageProcessor {
         let mut tmp_image = create_blank_image(dimensions);
         imageops::overlay(&mut tmp_image, &image, x_offset as i64, y_offset as i64);
 
-        let composite_image = self.build_image(&tmp_image, &mask, dimensions, ring);
+        let composite_image = self.build_image(&tmp_image, &mask, dimensions, ring)?;
 
         image_to_bytes(&composite_image)
+    }
+
+    pub fn load_border(&mut self, image_data: &[u8], meta: String) -> Result<(), JsValue> {
+        self.border = Some(ImageBorder::from_js(image_data, meta)?);
+
+        Ok(())
     }
 }
 
@@ -114,7 +124,11 @@ impl ImageProcessor {
         )
     }
 
-    pub fn create_ring_image(&self, dimension: ImageDimensions, ring_width: u32) -> DynamicImage {
+    pub fn create_ring_image(
+        &self,
+        dimension: ImageDimensions,
+        ring_width: u32,
+    ) -> (DynamicImage, DynamicImage) {
         let mut ring_image = create_blank_image(dimension);
         imageproc::drawing::draw_filled_circle_mut(
             &mut ring_image,
@@ -129,7 +143,7 @@ impl ImageProcessor {
             image::Rgba([0, 0, 0, 0]),
         );
 
-        ring_image
+        (create_blank_image(dimension), ring_image)
     }
 
     /// Build the final composite image with shadows and all.
@@ -141,7 +155,7 @@ impl ImageProcessor {
         mask: &DynamicImage,
         dimensions: ImageDimensions,
         ring: bool,
-    ) -> DynamicImage {
+    ) -> Result<DynamicImage, JsValue> {
         let circle_mask = self.create_stencil(dimensions);
         let circle_mask_inverted = self.create_inverted_stencil(dimensions);
         // circle mask that only keeps the center circle
@@ -155,9 +169,17 @@ impl ImageProcessor {
         let masked_image_inverted = image.stencil_and(&[&mask_stencil_inverted, &circle_stencil]);
 
         let ring_image = if ring {
-            self.create_ring_image(dimensions, 20)
+            if let Some(border) = &self.border {
+                border.get_ring(dimensions)?
+            } else {
+                // If no border is loaded, create a default ring image
+                self.create_ring_image(dimensions, 20)
+            }
         } else {
-            create_blank_image(dimensions)
+            (
+                create_blank_image(dimensions),
+                create_blank_image(dimensions),
+            )
         };
 
         let image_shadow_options = ShadowOptions::new_black(0.4, 3.0, 5, 5);
@@ -170,17 +192,18 @@ impl ImageProcessor {
         let ring_shadow = circle_mask_inverted.to_shadow(&ring_shadow_options);
         let stenciled_ring_shadow = ring_shadow.stencil(&circle_stencil);
 
-        overlay_images(
+        Ok(overlay_images(
             dimensions,
             &[
-                &image_shadow_non_mask,
-                &masked_image_inverted,
-                &stenciled_ring_shadow,
-                &ring_image,
-                &image_shadow_mask,
-                &masked_image,
+                &ring_image.0,          // the ring image background
+                &ring_image.1,          // the ring image foreground
+                &image_shadow_non_mask, // the image shadow everywhere except the masked area
+                &masked_image_inverted, // the image in the circle area except the masked area
+                &stenciled_ring_shadow, // the ring shadow in the circle area
+                &image_shadow_mask,     // the image shadow in the masked area
+                &masked_image,          // the image in the masked area
             ],
-        )
+        ))
     }
 
     pub fn mask_and_stencil_image(

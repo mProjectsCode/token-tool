@@ -15,7 +15,7 @@ import wasmbin from '../../../image-processing/pkg/image_processing_bg.wasm?url'
 let imageProcessor: ImageProcessor | null = null;
 
 function convertDimensions(dimensions: ImageDimensions): ID {
-	return new ID(dimensions.size, dimensions.stencilRadius);
+	return new ID(dimensions.size, dimensions.oversized, dimensions.stencilRadius);
 }
 
 const RPC = new RPCController<ImageWorkerRPCHandlersWorker, ImageWorkerRPCHandlersMain>(
@@ -40,8 +40,24 @@ const RPC = new RPCController<ImageWorkerRPCHandlersWorker, ImageWorkerRPCHandle
 				const img = imageProcessor!.render(data, mask, dims, transform, ring);
 				RPC.call('onRenderFinished', undefined, img);
 			} catch (error) {
-				RPC.call('onRenderError', undefined, error instanceof Error ? error.message : String(error));
+				RPC.call('onError', undefined, error instanceof Error ? error.message : String(error));
 			}
+		},
+		loadBorder: (img: Uint8Array, meta: string) => {
+			try {
+				imageProcessor!.load_border(img, meta);
+				RPC.call('onLoadBorderFinished', undefined);
+			} catch (error) {
+				RPC.call('onError', undefined, error instanceof Error ? error.message : String(error));
+			}
+		},
+		previewBorder: () => {
+			// try {
+			// 	const img = imageProcessor!.(img, meta);
+			// 	RPC.call('onPreviewBorderFinished', undefined);
+			// } catch (error) {
+			// 	RPC.call('onError', undefined, error instanceof Error ? error.message : String(error));
+			// }
 		},
 	},
 	m => postMessage(m),

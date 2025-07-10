@@ -51,6 +51,7 @@ export function getImageDimensions(creatureSize: CreatureSize, oversized: boolea
 
 	return {
 		size: canvasSize,
+		oversized: oversized,
 		stencilRadius: stencilRadius,
 	};
 }
@@ -115,4 +116,8 @@ export interface LoadedImage {
 	oversized: boolean;
 	transform: ImageTransform;
 	completed: boolean;
+}
+
+export function assertType<T>(value: T): void {
+	// no-op function to assert type at compile time
 }

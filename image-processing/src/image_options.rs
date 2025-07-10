@@ -25,15 +25,17 @@ impl ImageTransform {
 #[derive(Debug, Clone, Copy)]
 pub struct ImageDimensions {
     pub size: u32,
+    pub oversized: bool,
     pub stencil_radius: u32,
 }
 
 #[wasm_bindgen]
 impl ImageDimensions {
     #[wasm_bindgen(constructor)]
-    pub fn new(size: u32, stencil_radius: u32) -> Self {
+    pub fn new(size: u32, oversized: bool, stencil_radius: u32) -> Self {
         ImageDimensions {
             size,
+            oversized,
             stencil_radius,
         }
     }
