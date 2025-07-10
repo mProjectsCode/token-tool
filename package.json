@@ -34,6 +34,7 @@
 		"vite-plugin-wasm": "^3.4.1"
 	},
 	"dependencies": {
+		"idb-kv": "^2.2.0",
 		"jszip": "^3.10.1",
 		"mode-watcher": "^1.1.0"
 	}

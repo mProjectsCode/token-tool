@@ -39,14 +39,14 @@ export class ImageProcessor {
 	initialized: boolean = false;
 	queue: Task[] = [];
 	currentTask: Task | null = null;
+	onInitialized: () => void = () => {};
 
 	constructor() {
 		this.worker = new ImageWorker();
 
 		this.RPC = RPCController.toWorker<ImageWorkerRPCHandlersMain, ImageWorkerRPCHandlersWorker>(this.worker, {
 			onInitialized: () => {
-				console.log('Worker initialized');
-				this.initialized = true;
+				this.onInitialized();
 			},
 			onRenderFinished: img => {
 				console.log('Render finished');
@@ -96,7 +96,20 @@ export class ImageProcessor {
 				console.log('Worker log:', message);
 			},
 		});
-		this.RPC.call('initialize', undefined);
+	}
+
+	private async initialize(): Promise<void> {
+		if (this.initialized) {
+			return;
+		}
+		return new Promise<void>((resolve, reject) => {
+			this.onInitialized = () => {
+				console.log('Worker initialized');
+				this.initialized = true;
+				resolve();
+			};
+			this.RPC.call('initialize', undefined);
+		});
 	}
 
 	private update() {
@@ -163,6 +176,8 @@ export class ImageProcessor {
 		state: ImageTransform,
 		ring: boolean,
 	): Promise<Uint8Array> {
+		await this.initialize();
+
 		return new Promise((resolve, reject) => {
 			if (!this.initialized) {
 				console.warn('Worker not initialized yet');
@@ -191,6 +206,8 @@ export class ImageProcessor {
 	}
 
 	async loadBorder(data: Uint8Array, meta: string): Promise<void> {
+		await this.initialize();
+
 		return new Promise((resolve, reject) => {
 			if (!this.initialized) {
 				console.warn('Worker not initialized yet');
@@ -216,6 +233,8 @@ export class ImageProcessor {
 	}
 
 	async previewBorder(): Promise<Uint8Array> {
+		await this.initialize();
+
 		return new Promise((resolve, reject) => {
 			if (!this.initialized) {
 				console.warn('Worker not initialized yet');

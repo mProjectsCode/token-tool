@@ -4,6 +4,7 @@
     "": {
       "name": "token-tool",
       "dependencies": {
+        "idb-kv": "^2.2.0",
         "jszip": "^3.10.1",
         "mode-watcher": "^1.1.0",
       },
@@ -251,6 +252,8 @@
     "fsevents": ["fsevents@2.3.3", "", { "os": "darwin" }, "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="],
 
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
+
+    "idb-kv": ["idb-kv@2.2.0", "", {}, "sha512-JSzx4StMfq6L16GEoCMXNtInkcr3lpCoXilTBZKiSgxmcXIG7C37tLAkTEO83HpX/FLLoOB2SunakrHrazDUng=="],
 
     "immediate": ["immediate@3.0.6", "", {}, "sha512-XXOFtyqDjNDAQxVfYxuF7g9Il/IbWmmlQg2MYKOH8ExIT1qg6xc4zyS3HaEEATgs1btfzxq15ciUiY7gjSXRGQ=="],
 
