@@ -122,22 +122,13 @@ impl ImageBorder {
             frame.frame.height,
         );
 
-        let band_color = HexColor::parse(&self.config.default_ring_color)
-            .map_err(|e| JsValue::from_str(&format!("Failed to parse default ring color: {e}")))?;
+        let band_color = self.get_band_color()?;
+        let color_band = self.get_color_band(frame);
 
-        let cut_image: DynamicImage =
+        let cut_image: DynamicImage = if let Some(band_color) = band_color {
             ImageBuffer::from_fn(cut_image.width(), cut_image.height(), |x, y| {
                 let pixel = cut_image.get_pixel(x, y);
-                let in_color_band = {
-                    let squared_distance_to_center = (x as i32 - cut_image.width() as i32 / 2)
-                        .pow(2)
-                        + (y as i32 - cut_image.height() as i32 / 2).pow(2);
-                    let start_radius =
-                        frame.color_band.start_radius * (cut_image.width() as f32 / 2.0);
-                    let end_radius = frame.color_band.end_radius * (cut_image.width() as f32 / 2.0);
-                    squared_distance_to_center >= start_radius.powf(2.0) as i32
-                        && squared_distance_to_center <= end_radius.powf(2.0) as i32
-                };
+                let in_color_band = self.pixel_in_color_band(x, y, color_band, cut_image.width());
 
                 if in_color_band {
                     // We simply take the R channel as albedo.
@@ -150,7 +141,10 @@ impl ImageBorder {
                     pixel
                 }
             })
-            .into();
+            .into()
+        } else {
+            cut_image
+        };
 
         Ok(self.scale_img(cut_image, dimensions))
     }
@@ -180,6 +174,38 @@ impl ImageBorder {
         } else {
             scaled_img
         }
+    }
+
+    fn get_color_band<'a>(&'a self, frame: &'a RingFrame) -> &'a ColorBand {
+        frame
+            .color_band
+            .as_ref()
+            .unwrap_or(&self.config.default_color_band)
+    }
+
+    fn get_band_color(&self) -> Result<Option<HexColor>, JsValue> {
+        if let Some(color) = &self.config.default_ring_color {
+            HexColor::parse(color).map(Some).map_err(|e| {
+                JsValue::from_str(&format!("Failed to parse default ring color: {e}"))
+            })
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn pixel_in_color_band(
+        &self,
+        x: u32,
+        y: u32,
+        color_band: &ColorBand,
+        image_size: u32,
+    ) -> bool {
+        let squared_distance_to_center = (x as i32 - image_size as i32 / 2).pow(2)
+            + (y as i32 - image_size as i32 / 2).pow(2);
+        let start_radius = color_band.start_radius * (image_size as f32 / 2.0);
+        let end_radius = color_band.end_radius * (image_size as f32 / 2.0);
+        squared_distance_to_center >= start_radius.powf(2.0) as i32
+            && squared_distance_to_center <= end_radius.powf(2.0) as i32
     }
 }
 
@@ -248,9 +274,9 @@ pub struct RingFrame {
     #[serde(rename = "gridTarget")]
     pub grid_target: u32,
     #[serde(rename = "colorBand")]
-    pub color_band: ColorBand,
+    pub color_band: Option<ColorBand>,
     #[serde(rename = "ringThickness")]
-    pub ring_thickness: f32,
+    pub ring_thickness: Option<f32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -267,7 +293,7 @@ pub struct RingConfig {
     #[serde(rename = "defaultColorBand")]
     default_color_band: ColorBand,
     #[serde(rename = "defaultRingColor")]
-    default_ring_color: String, // Hex color code
+    default_ring_color: Option<String>, // Hex color code
 }
 
 #[derive(Debug, Clone, Deserialize)]
