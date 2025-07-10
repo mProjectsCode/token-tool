@@ -121,3 +121,11 @@ export interface LoadedImage {
 export function assertType<T>(value: T): void {
 	// no-op function to assert type at compile time
 }
+
+export function removeExtension(filename: string): string {
+	const lastDotIndex = filename.lastIndexOf('.');
+	if (lastDotIndex === -1) {
+		return filename; // No extension found
+	}
+	return filename.slice(0, lastDotIndex);
+}

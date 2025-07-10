@@ -1,12 +1,13 @@
 <script lang="ts">
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { getImageDimensions, type LoadedImage } from 'src/helpers/utils';
+	import { getImageDimensions, removeExtension, type LoadedImage } from 'src/helpers/utils';
 	import LoadedImageCard from './LoadedImageCard.svelte';
 	import { onDestroy, untrack } from 'svelte';
 	import Button from './ui/button/button.svelte';
 	import type { ImageProcessor } from 'src/helpers/image/imageProcessor';
 	import JSZip from 'jszip';
 	import { Progress } from '$lib/components/ui/progress/index.js';
+	import Checkbox from './ui/checkbox/checkbox.svelte';
 
 	let {
 		open = $bindable(),
@@ -20,9 +21,12 @@
 
 	let selectedImages = $state<number[]>([]);
 	let mode = $state<'select' | 'export'>('select');
+	let includeRing = $state<boolean>(true);
 	let completedRenders = $state<number>(0);
 	let failedRenders = $state<number>(0);
 	let zipUrl = $state<string | null>(null);
+
+	let toExportCount = $derived(selectedImages.length * (includeRing ? 2 : 1));
 
 	$effect(() => {
 		let _ = images;
@@ -49,6 +53,7 @@
 		await Promise.allSettled(
 			selectedImages.map(async index => {
 				const image = images[index];
+				const imageName = removeExtension(image.name);
 
 				try {
 					const data = await imageProcessor.asyncRender(
@@ -60,10 +65,28 @@
 					);
 					completedRenders += 1;
 
-					jszip.file(image.name, data);
+					jszip.file(`${imageName}-subject.webp`, data);
 				} catch (error) {
-					console.warn(`Error rendering image ${image.name}:`, error);
+					console.warn(`Error rendering image ${image.name}-subject:`, error);
 					failedRenders += 1;
+				}
+
+				if (includeRing) {
+					try {
+						const data = await imageProcessor.asyncRender(
+							image.data,
+							image.mask ? new Uint8Array(image.mask.data) : undefined,
+							getImageDimensions(image.size, image.oversized),
+							$state.snapshot(image.transform),
+							true,
+						);
+						completedRenders += 1;
+
+						jszip.file(`${imageName}-token.webp`, data);
+					} catch (error) {
+						console.warn(`Error rendering image ${image.name}-token:`, error);
+						failedRenders += 1;
+					}
 				}
 			}),
 		);
@@ -129,6 +152,15 @@
 				>
 					Select completed
 				</Button>
+				<Button
+					variant={includeRing ? 'secondary' : 'default'}
+					onclick={() => {
+						includeRing = !includeRing;
+					}}
+				>
+					Only subject art
+				</Button>
+
 				<div class="flex flex-1 items-center justify-end">
 					<span class="text-muted-foreground text-sm">
 						Selected: {selectedImages.length} / {images.length}
@@ -157,14 +189,14 @@
 		{:else}
 			<div class="flex flex-col gap-4">
 				<div class="flex flex-col gap-2">
-					<Progress value={(completedRenders / selectedImages.length) * 100} />
+					<Progress value={(completedRenders / toExportCount) * 100} />
 					{#if zipUrl}
 						<span
 							>Export completed! A <code>.zip</code> should have downloaded automatically.
 							<a href={zipUrl}>If not, you can click here to retry the download.</a></span
 						>
 					{:else}
-						<span>Exporting {completedRenders} / {selectedImages.length} images...</span>
+						<span>Exporting {completedRenders} / {toExportCount} images...</span>
 					{/if}
 					{#if failedRenders > 0}
 						<span class="text-sm text-red-500">
