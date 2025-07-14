@@ -83,7 +83,7 @@
 			try {
 				status = 'loading';
 				await imageProcessor.loadBorder(imgData, jsonData);
-				status = 'loaded';
+				status = 'idle';
 			} catch (error) {
 				console.error('Error loading token ring from local storage:', error);
 				status = 'error';
@@ -94,7 +94,7 @@
 </script>
 
 <Dialog.Root bind:open={open} onOpenChange={open => (open ? onOpen() : undefined)}>
-	<Dialog.Content>
+	<Dialog.Content class="w-[600px]! max-w-[600px]!">
 		<Dialog.Header>
 			<Dialog.Title>Token Ring</Dialog.Title>
 			<Dialog.Description>Select a token ring from your file system.</Dialog.Description>
@@ -106,8 +106,23 @@
 			<p class="text-sm">No token ring loaded.</p>
 		{/if}
 
-		<p class="text-lg font-semibold">Load token ring</p>
+		<div class="flex flex-col gap-2">
+			<div class="text-lg leading-none font-semibold">Load token ring</div>
+			<div class="text-muted-foreground text-sm">
+				You can upload a Foundry VTT compatible token ring sprite-sheet and a JSON file. The files for the
+				Foundry VTT default bronze and steel token rings can be found the the following folder on your system: <br
+				/>
+				<code class="text-secondary-foreground"
+					>[Foundry VTT install location]/resources/app/public/canvas/tokens/</code
+				>
+				<br />
+				For the default bronze token ring, you would need to select the files
+				<code class="text-secondary-foreground">rings-bronze.webp</code>
+				and <code class="text-secondary-foreground">rings-bronze.json</code>.
+			</div>
+		</div>
 
+		<div class="">Sprite-sheet</div>
 		<Input
 			bind:ref={imgInput}
 			id="token-img"
@@ -117,6 +132,7 @@
 			onchange={() => (status = 'idle')}
 		/>
 
+		<div class="">JSON</div>
 		<Input
 			bind:ref={jsonInput}
 			id="token-json"

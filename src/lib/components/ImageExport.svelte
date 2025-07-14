@@ -8,6 +8,12 @@
 	import JSZip from 'jszip';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import Checkbox from './ui/checkbox/checkbox.svelte';
+	import { Label } from '$lib/components/ui/label/index.js';
+
+	interface ExportOptions {
+		subject: boolean;
+		ring: boolean;
+	}
 
 	let {
 		open = $bindable(),
@@ -21,12 +27,17 @@
 
 	let selectedImages = $state<number[]>([]);
 	let mode = $state<'select' | 'export'>('select');
-	let includeRing = $state<boolean>(true);
+	let exportOptions = $state<ExportOptions>({
+		subject: true,
+		ring: true,
+	});
 	let completedRenders = $state<number>(0);
 	let failedRenders = $state<number>(0);
 	let zipUrl = $state<string | null>(null);
 
-	let toExportCount = $derived(selectedImages.length * (includeRing ? 2 : 1));
+	let toExportCount = $derived(
+		(exportOptions.subject ? selectedImages.length : 0) + (exportOptions.ring ? selectedImages.length : 0),
+	);
 
 	$effect(() => {
 		let _ = images;
@@ -40,13 +51,11 @@
 			return;
 		}
 
+		clearDownload();
+
 		mode = 'export';
 		completedRenders = 0;
 		failedRenders = 0;
-		if (zipUrl) {
-			URL.revokeObjectURL(zipUrl);
-		}
-		zipUrl = null;
 
 		const jszip = new JSZip();
 
@@ -55,29 +64,35 @@
 				const image = images[index];
 				const imageName = removeExtension(image.name);
 
-				try {
-					const data = await imageProcessor.asyncRender(
-						image.data,
-						image.mask ? new Uint8Array(image.mask.data) : undefined,
-						getImageDimensions(image.size, image.oversized),
-						$state.snapshot(image.transform),
-						false,
-					);
-					completedRenders += 1;
+				const imageMask = image.mask ? new Uint8Array(image.mask.data) : undefined;
+				const imageDimensions = getImageDimensions(image.size, image.oversized);
+				const imageTransform = $state.snapshot(image.transform);
 
-					jszip.file(`${imageName}-subject.webp`, data);
-				} catch (error) {
-					console.warn(`Error rendering image ${image.name}-subject:`, error);
-					failedRenders += 1;
-				}
-
-				if (includeRing) {
+				if (exportOptions.subject) {
 					try {
 						const data = await imageProcessor.asyncRender(
 							image.data,
-							image.mask ? new Uint8Array(image.mask.data) : undefined,
-							getImageDimensions(image.size, image.oversized),
-							$state.snapshot(image.transform),
+							imageMask,
+							imageDimensions,
+							imageTransform,
+							false,
+						);
+						completedRenders += 1;
+
+						jszip.file(`${imageName}-subject.webp`, data);
+					} catch (error) {
+						console.warn(`Error rendering image ${image.name}-subject:`, error);
+						failedRenders += 1;
+					}
+				}
+
+				if (exportOptions.ring) {
+					try {
+						const data = await imageProcessor.asyncRender(
+							image.data,
+							imageMask,
+							imageDimensions,
+							imageTransform,
 							true,
 						);
 						completedRenders += 1;
@@ -113,20 +128,48 @@
 	}
 
 	onDestroy(() => {
+		clearDownload();
+	});
+
+	function clearDownload() {
 		if (zipUrl) {
 			URL.revokeObjectURL(zipUrl);
+			zipUrl = null;
 		}
-	});
+	}
 </script>
 
 <Dialog.Root bind:open={open}>
 	<Dialog.Content class="w-[80vw]! max-w-[80vw]!">
-		<Dialog.Header>
-			<Dialog.Title>Export Tokens</Dialog.Title>
-			<Dialog.Description>Export your tokens as images.</Dialog.Description>
-		</Dialog.Header>
-
 		{#if mode === 'select'}
+			<div class="flex flex-col gap-2">
+				<div class="text-lg leading-none font-semibold">Export options</div>
+				<div class="text-muted-foreground text-sm">
+					Select how your tokens should be exported and which token versions the export should include.
+				</div>
+			</div>
+
+			<div class="flex flex-col gap-6">
+				<div class="flex items-center gap-3">
+					<Checkbox bind:checked={exportOptions.subject} />
+					<Label>Include version with <strong>no</strong> token ring (for use with dynamic token rings)</Label
+					>
+				</div>
+				<div class="flex items-center gap-3">
+					<Checkbox bind:checked={exportOptions.ring} />
+					<Label>Include version with token ring</Label>
+				</div>
+			</div>
+
+			<div class="flex flex-col gap-2">
+				<div class="text-lg leading-none font-semibold">Image selection</div>
+				<div class="text-muted-foreground text-sm">
+					Select which images you want to export as tokens. You can select images via the buttons below or by
+					clicking on the images. The images you marked as completed while editing have a checkmark in the top
+					right corner.
+				</div>
+			</div>
+
 			<div class="flex flex-row gap-2">
 				<Button
 					variant="outline"
@@ -152,21 +195,13 @@
 				>
 					Select completed
 				</Button>
-				<Button
-					variant={includeRing ? 'secondary' : 'default'}
-					onclick={() => {
-						includeRing = !includeRing;
-					}}
-				>
-					Only subject art
-				</Button>
 
 				<div class="flex flex-1 items-center justify-end">
 					<span class="text-muted-foreground text-sm">
 						Selected: {selectedImages.length} / {images.length}
 					</span>
 				</div>
-				<Button variant="default" disabled={selectedImages.length === 0} onclick={() => exportSelectedImages()}>
+				<Button variant="default" disabled={toExportCount === 0} onclick={() => exportSelectedImages()}>
 					Export
 				</Button>
 			</div>
@@ -187,22 +222,36 @@
 				{/each}
 			</div>
 		{:else}
+			{#if !zipUrl}
+				<div class="flex flex-col gap-2">
+					<div class="text-lg leading-none font-semibold">Exporting tokens</div>
+					<div class="text-muted-foreground text-sm">
+						Exporting your tokens. This may take a while depending on the number of images you selected.
+					</div>
+				</div>
+			{:else}
+				<div class="flex flex-col gap-2">
+					<div class="text-lg leading-none font-semibold">Export completed</div>
+					<div class="text-muted-foreground text-sm">
+						A <code>.zip</code> should have downloaded automatically.
+						<a href={zipUrl}>If not, you can click here to retry the download.</a>
+					</div>
+				</div>
+			{/if}
+
 			<div class="flex flex-col gap-4">
 				<div class="flex flex-col gap-2">
-					<Progress value={(completedRenders / toExportCount) * 100} />
-					{#if zipUrl}
-						<span
-							>Export completed! A <code>.zip</code> should have downloaded automatically.
-							<a href={zipUrl}>If not, you can click here to retry the download.</a></span
+					{#if !zipUrl}
+						<span class="text-muted-foreground text-sm"
+							>Exporting {completedRenders} / {toExportCount} images...</span
 						>
-					{:else}
-						<span>Exporting {completedRenders} / {toExportCount} images...</span>
 					{/if}
 					{#if failedRenders > 0}
 						<span class="text-sm text-red-500">
 							{failedRenders} images failed to render.
 						</span>
 					{/if}
+					<Progress value={(completedRenders / toExportCount) * 100} />
 				</div>
 				{#if zipUrl}
 					<div class="flex flex-row-reverse gap-2">
