@@ -1,6 +1,6 @@
-use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba, imageops};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
 
-use crate::{create_blank_image, image_options::ImageDimensions};
+use crate::{image_options::ImageDimensions};
 
 #[allow(dead_code)]
 pub trait ImageStencil {
@@ -83,12 +83,25 @@ impl<'a> StencilMask<'a> {
     }
 }
 
-pub fn overlay_images(dimensions: ImageDimensions, images: &[&DynamicImage]) -> DynamicImage {
-    let mut composite_image = create_blank_image(dimensions);
+pub fn overlay_images(dimensions: &ImageDimensions, images: &[&DynamicImage]) -> DynamicImage {
+    ImageBuffer::from_fn(dimensions.size, dimensions.size, |x, y| {
+        let mut final_pixel = (0.0, 0.0, 0.0, 0.0); // (r, g, b, a)
 
-    for image in images {
-        imageops::overlay(&mut composite_image, *image, 0, 0);
-    }
+        for image in images {
+            let pixel = image.get_pixel(x, y);
+            let alpha = pixel[3] as f32 / 255.0;
 
-    composite_image
+            final_pixel.0 = final_pixel.0 * (1.0 - alpha) + pixel[0] as f32 * alpha;
+            final_pixel.1 = final_pixel.1 * (1.0 - alpha) + pixel[1] as f32 * alpha;
+            final_pixel.2 = final_pixel.2 * (1.0 - alpha) + pixel[2] as f32 * alpha;
+            final_pixel.3 = final_pixel.3 + alpha * (1.0 - final_pixel.3);
+        }
+
+        Rgba([
+            final_pixel.0.clamp(0.0, 255.0) as u8,
+            final_pixel.1.clamp(0.0, 255.0) as u8,
+            final_pixel.2.clamp(0.0, 255.0) as u8,
+            (final_pixel.3 * 255.0).clamp(0.0, 255.0) as u8,
+        ])
+    }).into()
 }

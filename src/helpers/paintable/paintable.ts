@@ -1,4 +1,4 @@
-import type { ImageDimensions } from '../image/imageWorkerRPC';
+import type { ImageDimensions } from 'image-processing/pkg/image_processing';
 
 export class Paintable {
 	private canvas: HTMLCanvasElement;

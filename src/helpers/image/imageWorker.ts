@@ -1,22 +1,9 @@
-import type {
-	ImageTransform,
-	ImageDimensions,
-	ImageWorkerRPCHandlersMain,
-	ImageWorkerRPCHandlersWorker,
-} from './imageWorkerRPC';
+import type { ImageWorkerRPCHandlersMain, ImageWorkerRPCHandlersWorker } from './imageWorkerRPC';
 import { RPCController } from '../RPC';
-import init, {
-	ImageProcessor,
-	ImageTransform as IT,
-	ImageDimensions as ID,
-} from '../../../image-processing/pkg/image_processing';
+import init, { ImageProcessor, type ImageRenderOptions } from '../../../image-processing/pkg/image_processing';
 import wasmbin from '../../../image-processing/pkg/image_processing_bg.wasm?url';
 
 let imageProcessor: ImageProcessor | null = null;
-
-function convertDimensions(dimensions: ImageDimensions): ID {
-	return new ID(dimensions.size, dimensions.oversized, dimensions.stencilRadius);
-}
 
 const RPC = new RPCController<ImageWorkerRPCHandlersWorker, ImageWorkerRPCHandlersMain>(
 	{
@@ -26,18 +13,9 @@ const RPC = new RPCController<ImageWorkerRPCHandlersWorker, ImageWorkerRPCHandle
 				RPC.call('onInitialized', undefined);
 			});
 		},
-		render(
-			data: Uint8Array,
-			mask: Uint8Array | undefined,
-			dimensions: ImageDimensions,
-			state: ImageTransform,
-			ring: boolean,
-		) {
-			const transform = new IT(state.posX, state.posY, state.scale, state.flipped);
-			const dims = convertDimensions(dimensions);
-
+		render(data: Uint8Array, mask: Uint8Array | undefined, opts: ImageRenderOptions) {
 			try {
-				const img = imageProcessor!.render(data, mask, dims, transform, ring);
+				const img = imageProcessor!.render(data, mask, opts);
 				RPC.call('onRenderFinished', undefined, img);
 			} catch (error) {
 				RPC.call('onError', undefined, error instanceof Error ? error.message : String(error));

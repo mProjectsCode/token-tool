@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ImageDimensions } from '../../helpers/image/imageWorkerRPC';
+	import type { ImageDimensions } from 'image-processing/pkg/image_processing';
 	import { Paintable } from '../../helpers/paintable/paintable';
 	import { onMount } from 'svelte';
 

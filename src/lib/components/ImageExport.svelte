@@ -9,6 +9,7 @@
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import Checkbox from './ui/checkbox/checkbox.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import type { ImageRenderOptions } from 'image-processing/pkg/image_processing';
 
 	interface ExportOptions {
 		subject: boolean;
@@ -70,13 +71,13 @@
 
 				if (exportOptions.subject) {
 					try {
-						const data = await imageProcessor.asyncRender(
-							image.data,
-							imageMask,
-							imageDimensions,
-							imageTransform,
-							false,
-						);
+						const opts: ImageRenderOptions = {
+							dimensions: imageDimensions,
+							transform: imageTransform,
+							ring: false,
+						};
+
+						const data = await imageProcessor.render(image.data, imageMask, opts);
 						completedRenders += 1;
 
 						jszip.file(`${imageName}-subject.webp`, data);
@@ -88,13 +89,13 @@
 
 				if (exportOptions.ring) {
 					try {
-						const data = await imageProcessor.asyncRender(
-							image.data,
-							imageMask,
-							imageDimensions,
-							imageTransform,
-							true,
-						);
+						const opts: ImageRenderOptions = {
+							dimensions: imageDimensions,
+							transform: imageTransform,
+							ring: true,
+						};
+
+						const data = await imageProcessor.render(image.data, imageMask, opts);
 						completedRenders += 1;
 
 						jszip.file(`${imageName}-token.webp`, data);
@@ -190,7 +191,7 @@
 				<Button
 					variant="outline"
 					onclick={() => {
-						selectedImages = images.filter(image => image.completed).map((_, index) => index);
+						selectedImages = images.map((_, index) => index).filter(index => images[index].completed);
 					}}
 				>
 					Select completed

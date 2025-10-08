@@ -13,9 +13,9 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { ImageProcessor } from 'src/helpers/image/imageProcessor';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { tick, untrack } from 'svelte';
+	import { tick } from 'svelte';
 	import { Slider } from '$lib/components/ui/slider/index.js';
-	import { Check, Paintbrush, Scaling } from '@lucide/svelte';
+	import { Paintbrush, Scaling } from '@lucide/svelte';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -25,6 +25,7 @@
 	import LoadedImageCard from './LoadedImageCard.svelte';
 	import ImageExport from './ImageExport.svelte';
 	import TokenRing from './TokenRing.svelte';
+	import type { ImageRenderOptions } from 'image-processing/pkg/image_processing';
 
 	interface DragState {
 		startX: number;
@@ -53,14 +54,15 @@
 				const data = await readFileAsArrayBuffer(file);
 				return {
 					name: file.name,
-					data: new Uint8Array(data),
+					data: data,
+					imgUrl: URL.createObjectURL(new Blob([data as BlobPart])),
 					mask: undefined,
 					size: CreatureSize.Medium,
 					oversized: false,
 					transform: {
 						scale: 1,
-						posX: 0,
-						posY: 0,
+						pos_x: 0,
+						pos_y: 0,
 						flipped: false,
 					},
 					completed: false,
@@ -145,19 +147,19 @@
 			return; // Only allow keyboard input in positioning mode
 		}
 
-		const step = 10; // Pixels to move per key press
+		const step = 5; // Pixels to move per key press
 		switch (event.key) {
 			case 'ArrowUp':
-				activeImage.transform.posY -= step;
+				activeImage.transform.pos_y += step;
 				break;
 			case 'ArrowDown':
-				activeImage.transform.posY += step;
+				activeImage.transform.pos_y -= step;
 				break;
 			case 'ArrowLeft':
-				activeImage.transform.posX -= step;
+				activeImage.transform.pos_x += step;
 				break;
 			case 'ArrowRight':
-				activeImage.transform.posX += step;
+				activeImage.transform.pos_x -= step;
 				break;
 			case 'PageUp':
 				zoomIn();
@@ -203,8 +205,8 @@
 		dragState = {
 			startX: mouseCanvasX,
 			startY: mouseCanvasY,
-			startImgX: activeImage.transform.posX,
-			startImgY: activeImage.transform.posY,
+			startImgX: activeImage.transform.pos_x,
+			startImgY: activeImage.transform.pos_y,
 			leftMouseButton: event.button === 0,
 		};
 	}
@@ -242,8 +244,8 @@
 				const dx = mouseCanvasX - dragState.startX;
 				const dy = mouseCanvasY - dragState.startY;
 
-				activeImage.transform.posX = dragState.startImgX + Math.round(dx / canvasSizeMul);
-				activeImage.transform.posY = dragState.startImgY + Math.round(dy / canvasSizeMul);
+				activeImage.transform.pos_x = dragState.startImgX + Math.round(dx / canvasSizeMul);
+				activeImage.transform.pos_y = dragState.startImgY + Math.round(dy / canvasSizeMul);
 			}
 		}
 	}
@@ -251,7 +253,7 @@
 	function zoomIn() {
 		if (!activeImage) return;
 
-		activeImage.transform.scale += activeImage.transform.scale * 0.1;
+		activeImage.transform.scale += activeImage.transform.scale * 0.05;
 		if (activeImage.transform.scale > 100) {
 			activeImage.transform.scale = 100; // Limit max scale
 		}
@@ -260,7 +262,7 @@
 	function zoomOut() {
 		if (!activeImage) return;
 
-		activeImage.transform.scale -= activeImage.transform.scale * 0.1;
+		activeImage.transform.scale -= activeImage.transform.scale * 0.05;
 		if (activeImage.transform.scale < 0.01) {
 			activeImage.transform.scale = 0.01; // Limit min scale
 		}
@@ -367,18 +369,18 @@
 				{#if activeImage}
 					<img
 						draggable="false"
-						src={URL.createObjectURL(new Blob([activeImage.data]))}
+						src={activeImage.imgUrl}
 						alt={activeImage.name}
 						class="absolute top-1/2 left-1/2"
-						style="transform: translate(calc({(activeImage.transform.posX ?? 0) *
-							canvasSizeMul}px - 50%), calc({(activeImage.transform.posY ?? 0) *
+						style="transform: translate(calc({(activeImage.transform.pos_x ?? 0) *
+							canvasSizeMul}px - 50%), calc({(activeImage.transform.pos_y ?? 0) *
 							canvasSizeMul}px - 50%)) scale({(activeImage.transform.scale ?? 1.0) *
 							canvasSizeMul}); max-width: unset; max-height: unset;"
 					/>
 				{/if}
 				<svg class="absolute" height={canvasSize} width={canvasSize}>
 					<circle
-						r={dimensions.stencilRadius * canvasSizeMul}
+						r={dimensions.stencil_radius * canvasSizeMul}
 						cx={canvasSize / 2}
 						cy={canvasSize / 2}
 						fill="#ff000030"
@@ -430,9 +432,9 @@
 
 						<!-- Positioning -->
 						<Label>Position X</Label>
-						<Input type="number" bind:value={activeImage.transform.posX} />
+						<Input type="number" bind:value={activeImage.transform.pos_x} />
 						<Label>Position Y</Label>
-						<Input type="number" bind:value={activeImage.transform.posY} />
+						<Input type="number" bind:value={activeImage.transform.pos_y} />
 
 						<!-- Painting -->
 						<Label>Brush size</Label>
@@ -448,15 +450,24 @@
 
 								saveMask();
 
+								const opts: ImageRenderOptions = {
+									dimensions: $state.snapshot(dimensions),
+									transform: $state.snapshot(activeImage.transform),
+									ring: true,
+								};
+
 								previewImgHolder.clearImage();
-								imageProcessor.render(
-									activeImage.data,
-									activeImage.mask ? new Uint8Array(activeImage.mask.data) : undefined,
-									$state.snapshot(dimensions),
-									$state.snapshot(activeImage.transform),
-									true,
-									img => previewImgHolder.setImage(new Blob([img], { type: 'image/webp' })),
-								);
+								try {
+									previewImgHolder.setError(null);
+									const image_data = await imageProcessor.render(
+										activeImage.data,
+										activeImage.mask ? new Uint8Array(activeImage.mask.data) : undefined,
+										opts,
+									);
+									previewImgHolder.setImageFromData(image_data);
+								} catch (error) {
+									previewImgHolder.setError(`Error rendering preview: ${(error as Error).message}`);
+								}
 							}
 						}}
 					>
@@ -482,6 +493,8 @@
 										alt="Preview"
 										class="aspect-square w-full border bg-white"
 									/>
+								{:else if previewImgHolder.error}
+									<span class="text-red-600">{previewImgHolder.error}</span>
 								{:else}
 									<span class="text-muted-foreground">Rendering preview...</span>
 								{/if}

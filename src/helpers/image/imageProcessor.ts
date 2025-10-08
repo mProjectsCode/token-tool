@@ -1,20 +1,14 @@
-import type {
-	ImageDimensions,
-	ImageTransform,
-	ImageWorkerRPCHandlersMain,
-	ImageWorkerRPCHandlersWorker,
-} from './imageWorkerRPC';
+import type { ImageWorkerRPCHandlersMain, ImageWorkerRPCHandlersWorker } from './imageWorkerRPC';
 import { RPCController } from '../RPC';
 import ImageWorker from './imageWorker?worker';
 import { assertType } from '../utils';
+import type { ImageRenderOptions } from 'image-processing/pkg/image_processing';
 
 interface RenderTask {
 	type: 'render';
 	data: Uint8Array;
 	mask: Uint8Array | undefined;
-	dims: ImageDimensions;
-	state: ImageTransform;
-	ring: boolean;
+	opts: ImageRenderOptions;
 	cb: (img: Uint8Array | string) => void;
 }
 
@@ -123,7 +117,7 @@ export class ImageProcessor {
 		}
 		this.currentTask = task;
 		if (task.type === 'render') {
-			this.RPC.call('render', undefined, task.data, task.mask, task.dims, task.state, task.ring);
+			this.RPC.call('render', undefined, task.data, task.mask, task.opts);
 			return;
 		}
 		if (task.type === 'loadBorder') {
@@ -137,45 +131,7 @@ export class ImageProcessor {
 		assertType<never>(task);
 	}
 
-	render(
-		data: Uint8Array,
-		mask: Uint8Array | undefined,
-		dims: ImageDimensions,
-		state: ImageTransform,
-		ring: boolean,
-		cb: (img: Uint8Array) => void,
-	): void {
-		if (!this.initialized) {
-			console.warn('Worker not initialized yet');
-			return;
-		}
-
-		this.queue.push({
-			type: 'render',
-			data,
-			mask,
-			dims,
-			state,
-			ring,
-			cb: img => {
-				if (typeof img === 'string') {
-					throw new Error(`Image rendering error: ${img}`);
-				} else {
-					cb(img);
-				}
-			},
-		});
-
-		this.update();
-	}
-
-	async asyncRender(
-		data: Uint8Array,
-		mask: Uint8Array | undefined,
-		dims: ImageDimensions,
-		state: ImageTransform,
-		ring: boolean,
-	): Promise<Uint8Array> {
+	async render(data: Uint8Array, mask: Uint8Array | undefined, opts: ImageRenderOptions): Promise<Uint8Array> {
 		await this.initialize();
 
 		return new Promise((resolve, reject) => {
@@ -189,9 +145,7 @@ export class ImageProcessor {
 				type: 'render',
 				data,
 				mask,
-				dims,
-				state,
-				ring,
+				opts,
 				cb: img => {
 					if (typeof img === 'string') {
 						reject(new Error(`Image rendering error: ${img}`));

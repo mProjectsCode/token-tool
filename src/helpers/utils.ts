@@ -1,4 +1,4 @@
-import type { ImageDimensions, ImageTransform } from './image/imageWorkerRPC';
+import type { ImageDimensions, ImageTransform } from 'image-processing/pkg/image_processing';
 
 export async function readFileAsArrayBuffer(file: File): Promise<Uint8Array> {
 	return new Promise((resolve, reject) => {
@@ -52,7 +52,7 @@ export function getImageDimensions(creatureSize: CreatureSize, oversized: boolea
 	return {
 		size: canvasSize,
 		oversized: oversized,
-		stencilRadius: stencilRadius,
+		stencil_radius: stencilRadius,
 	};
 }
 
@@ -111,6 +111,7 @@ export class Throttle<F extends (...args: any[]) => void> {
 export interface LoadedImage {
 	name: string;
 	data: Uint8Array;
+	imgUrl: string;
 	mask: ImageData | undefined;
 	size: CreatureSize;
 	oversized: boolean;

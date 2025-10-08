@@ -11,12 +11,7 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-wasm-bindgen = "0.2.100"
-
-# The `console_error_panic_hook` crate provides better debugging of panics by
-# logging them with `console.error`. This is great for development, but requires
-# all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
-# code size when deploying.
+wasm-bindgen = "0.2.101"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 image = { version = "0.25.6", default-features = false, features = ["jpeg", "png", "webp"] }
 imageproc = { version = "0.25.0", default-features = false }
@@ -24,6 +19,7 @@ web-sys = { version = "0.3.77", features = ["OffscreenCanvasRenderingContext2d",
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 hex_color = "3.0.0"
+tsify = { version = "0.5.5", features = ["js"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"

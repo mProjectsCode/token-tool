@@ -65,7 +65,7 @@ impl ImageBorder {
 
     pub fn get_ring(
         &self,
-        dimensions: ImageDimensions,
+        dimensions: &ImageDimensions,
     ) -> Result<(DynamicImage, DynamicImage), JsValue> {
         let (bkg_frame, ring_frame) = self.get_frame_for_dimensions(dimensions)?;
 
@@ -77,16 +77,18 @@ impl ImageBorder {
 
     fn get_frame_for_dimensions(
         &self,
-        dimensions: ImageDimensions,
+        dimensions: &ImageDimensions,
     ) -> Result<(&BkgFrame, &RingFrame), JsValue> {
+        let token_size = dimensions.token_size();
+
         let best_bkg_frame = self
             .bkg_frames
             .iter()
-            .find(|frame| frame.frame.width >= dimensions.size);
+            .find(|frame| frame.frame.width >= token_size);
         let best_ring_frame = self
             .ring_frames
             .iter()
-            .find(|frame| frame.frame.width >= dimensions.size);
+            .find(|frame| frame.frame.width >= token_size);
 
         match (best_bkg_frame, best_ring_frame) {
             (Some(bkg_frame), Some(ring_frame)) => Ok((bkg_frame, ring_frame)),
@@ -94,12 +96,12 @@ impl ImageBorder {
                 "No suitable ring ({}) or background frame ({}) found for the given dimensions ({})",
                 self.ring_frames.len(),
                 self.bkg_frames.len(),
-                dimensions.size
+                token_size
             ))),
         }
     }
 
-    fn cut_and_scale_bkg(&self, frame: &BkgFrame, dimensions: ImageDimensions) -> DynamicImage {
+    fn cut_and_scale_bkg(&self, frame: &BkgFrame, dimensions: &ImageDimensions) -> DynamicImage {
         let cut_image = self.sprite_sheet.crop_imm(
             frame.frame.x as u32,
             frame.frame.y as u32,
@@ -113,7 +115,7 @@ impl ImageBorder {
     fn cut_and_scale_ring(
         &self,
         frame: &RingFrame,
-        dimensions: ImageDimensions,
+        dimensions: &ImageDimensions,
     ) -> Result<DynamicImage, JsValue> {
         let cut_image = self.sprite_sheet.crop_imm(
             frame.frame.x as u32,
@@ -149,12 +151,8 @@ impl ImageBorder {
         Ok(self.scale_img(cut_image, dimensions))
     }
 
-    fn scale_img(&self, image: DynamicImage, dimensions: ImageDimensions) -> DynamicImage {
-        let token_size = if dimensions.oversized {
-            dimensions.size / 2
-        } else {
-            dimensions.size
-        };
+    fn scale_img(&self, image: DynamicImage, dimensions: &ImageDimensions) -> DynamicImage {
+        let token_size = dimensions.token_size();
 
         let scaled_img = if image.width() == token_size && image.height() == token_size {
             image
@@ -200,12 +198,15 @@ impl ImageBorder {
         color_band: &ColorBand,
         image_size: u32,
     ) -> bool {
-        let squared_distance_to_center = (x as i32 - image_size as i32 / 2).pow(2)
-            + (y as i32 - image_size as i32 / 2).pow(2);
+        let image_center = (image_size - 1) as f32 / 2.0;
+        let squared_distance_to_center = (x as f32 - image_center).powf(2.0)
+            + (y as f32 - image_center).powf(2.0);
+
         let start_radius = color_band.start_radius * (image_size as f32 / 2.0);
         let end_radius = color_band.end_radius * (image_size as f32 / 2.0);
-        squared_distance_to_center >= start_radius.powf(2.0) as i32
-            && squared_distance_to_center <= end_radius.powf(2.0) as i32
+        
+        squared_distance_to_center >= start_radius.powf(2.0)
+            && squared_distance_to_center <= end_radius.powf(2.0)
     }
 }
 

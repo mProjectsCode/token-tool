@@ -12,13 +12,13 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     image_border::ImageBorder,
-    image_options::{ImageDimensions, ImageTransform},
+    image_options::{ImageDimensions, ImageRenderOptions, ImageTransform},
     image_shadow::{ImageShadow, ShadowOptions},
-    image_stencil::{ImageStencil, overlay_images},
+    image_stencil::{overlay_images, ImageStencil},
     utils::set_panic_hook,
 };
 
-fn create_blank_image(dimensions: ImageDimensions) -> DynamicImage {
+fn create_blank_image(dimensions: &ImageDimensions) -> DynamicImage {
     let blank_image = image::ImageBuffer::new(dimensions.size, dimensions.size);
     DynamicImage::ImageRgba8(blank_image)
 }
@@ -52,12 +52,10 @@ impl ImageProcessor {
         &self,
         image_data: &[u8],
         mask_data: Option<Vec<u8>>,
-        dimensions: ImageDimensions,
-        transform: ImageTransform,
-        ring: bool,
+        options: ImageRenderOptions,
     ) -> Result<Vec<u8>, JsValue> {
         // Load the image data into a DynamicImage
-        let mut image: DynamicImage = ImageReader::new(Cursor::new(image_data))
+        let image: DynamicImage = ImageReader::new(Cursor::new(image_data))
             .with_guessed_format()
             .map_err(|e| JsValue::from_str(&format!("Failed to read image: {e}")))?
             .decode()
@@ -65,37 +63,22 @@ impl ImageProcessor {
 
         let mask: DynamicImage = match mask_data {
             Some(x) => {
-                ImageBuffer::<Rgba<u8>, Vec<u8>>::from_vec(dimensions.size, dimensions.size, x)
+                ImageBuffer::<Rgba<u8>, Vec<u8>>::from_vec(options.dimensions.size, options.dimensions.size, x)
                     .ok_or(JsValue::from_str(
                         "Failed to create mask image from provided data",
                     ))?
                     .into()
             }
-            None => create_blank_image(dimensions),
+            None => create_blank_image(&options.dimensions),
         };
 
-        // calc transformed dimensions and offsets
-        let (scaled_width, scaled_height) = self.get_scaled_dimensions(&image, transform.scale);
-
-        let x_offset = (dimensions.size as i32 - scaled_width) / 2 + transform.pos_x;
-        let y_offset = (dimensions.size as i32 - scaled_height) / 2 + transform.pos_y;
-
-        // flip the image if needed
-        if transform.flipped {
-            image = image.fliph();
-        }
-        // resize the image
-        image = image.resize(
-            scaled_width as u32,
-            scaled_height as u32,
-            imageops::FilterType::CatmullRom,
+        let image = self.cut_and_transform(
+            image,
+            &options.dimensions,
+            &options.transform,
         );
 
-        // Crop the image to the correct size
-        let mut tmp_image = create_blank_image(dimensions);
-        imageops::overlay(&mut tmp_image, &image, x_offset as i64, y_offset as i64);
-
-        let composite_image = self.build_image(&tmp_image, &mask, dimensions, ring)?;
+        let composite_image = self.build_image(&image, &mask, &options)?;
 
         image_to_bytes(&composite_image)
     }
@@ -108,25 +91,39 @@ impl ImageProcessor {
 }
 
 impl ImageProcessor {
-    pub fn get_scaled_dimensions(&self, image: &DynamicImage, scale: f32) -> (i32, i32) {
-        let scaled_width = (image.width() as f32 * scale) as i32;
-        let scaled_height = (image.height() as f32 * scale) as i32;
-        (scaled_width, scaled_height)
-    }
+    /// Cut the image to fit into the given dimensions, centering it and applying the given image transform.
+    pub fn cut_and_transform(&self, image: DynamicImage, dimensions: &ImageDimensions, image_transform: &ImageTransform) -> DynamicImage {
+        // first flip if needed
+        let image = if image_transform.flipped {
+            image.fliph()
+        } else {
+            image
+        };
 
-    pub fn scale_image(&mut self, image: DynamicImage, scale: f32) -> DynamicImage {
-        let (scaled_width, scaled_height) = self.get_scaled_dimensions(&image, scale);
+        // second scale
+        let scaled_width = (image.width() as f32 * image_transform.scale) as u32;
+        let scaled_height = (image.height() as f32 * image_transform.scale) as u32;
 
-        image.resize(
-            scaled_width as u32,
-            scaled_height as u32,
+        let image= image.resize(
+            scaled_width,
+            scaled_height,
             imageops::FilterType::CatmullRom,
-        )
+        );
+
+        // then calculate the offsets
+        let x_offset = (dimensions.size as i32 - image.width() as i32) / 2 + image_transform.pos_x;
+        let y_offset = (dimensions.size as i32 - image.height() as i32) / 2 + image_transform.pos_y;
+
+        // finally, cut the image by overlaying it on a blank canvas of the right size
+        let mut tmp_image = create_blank_image(dimensions);
+        imageops::overlay(&mut tmp_image, &image, x_offset as i64, y_offset as i64);
+
+        tmp_image
     }
 
     pub fn create_ring_image(
         &self,
-        dimension: ImageDimensions,
+        dimension: &ImageDimensions,
         ring_width: u32,
     ) -> (DynamicImage, DynamicImage) {
         let mut ring_image = create_blank_image(dimension);
@@ -153,32 +150,31 @@ impl ImageProcessor {
         &self,
         image: &DynamicImage,
         mask: &DynamicImage,
-        dimensions: ImageDimensions,
-        ring: bool,
+        options: &ImageRenderOptions,
     ) -> Result<DynamicImage, JsValue> {
-        let circle_mask = self.create_stencil(dimensions);
-        let circle_mask_inverted = self.create_inverted_stencil(dimensions);
+        let circle_mask = self.create_stencil(&options.dimensions);
+        let circle_mask_inverted = self.create_inverted_stencil(&options.dimensions);
         // circle mask that only keeps the center circle
         let circle_stencil = circle_mask.to_stencil(0);
         // inverted circle mask that keeps everything outside the center circle
-        // let circle_stencil_inverted = circle_mask.to_inverted_stencil(0);
+        // let circle_stencil_inverted = circle_mask.to_inverted_stencil();
 
         let mask_stencil = mask.to_stencil(0);
         let mask_stencil_inverted = mask.to_inverted_stencil(0);
         let masked_image = image.stencil(&mask_stencil);
         let masked_image_inverted = image.stencil_and(&[&mask_stencil_inverted, &circle_stencil]);
 
-        let ring_image = if ring {
+        let (ring_bg, ring_fg) = if options.ring {
             if let Some(border) = &self.border {
-                border.get_ring(dimensions)?
+                border.get_ring(&options.dimensions)?
             } else {
                 // If no border is loaded, create a default ring image
-                self.create_ring_image(dimensions, 20)
+                self.create_ring_image(&options.dimensions, 20)
             }
         } else {
             (
-                create_blank_image(dimensions),
-                create_blank_image(dimensions),
+                create_blank_image(&options.dimensions),
+                create_blank_image(&options.dimensions),
             )
         };
 
@@ -193,10 +189,10 @@ impl ImageProcessor {
         let stenciled_ring_shadow = ring_shadow.stencil(&circle_stencil);
 
         Ok(overlay_images(
-            dimensions,
+            &options.dimensions,
             &[
-                &ring_image.0,          // the ring image background
-                &ring_image.1,          // the ring image foreground
+                &ring_bg,               // the ring image background
+                &ring_fg,               // the ring image foreground
                 &image_shadow_non_mask, // the image shadow everywhere except the masked area
                 &masked_image_inverted, // the image in the circle area except the masked area
                 &stenciled_ring_shadow, // the ring shadow in the circle area
@@ -210,7 +206,7 @@ impl ImageProcessor {
         &self,
         image: &DynamicImage,
         mask: &DynamicImage,
-        dimensions: ImageDimensions,
+        dimensions: &ImageDimensions,
     ) -> DynamicImage {
         ImageBuffer::from_fn(dimensions.size, dimensions.size, |x, y| {
             let distance_to_center = (x as i32 - (dimensions.size / 2) as i32).pow(2)
@@ -227,7 +223,7 @@ impl ImageProcessor {
         .into()
     }
 
-    pub fn create_stencil(&self, dimensions: ImageDimensions) -> DynamicImage {
+    pub fn create_stencil(&self, dimensions: &ImageDimensions) -> DynamicImage {
         let mut stencil_image = create_blank_image(dimensions);
         imageproc::drawing::draw_filled_circle_mut(
             &mut stencil_image,
@@ -238,7 +234,7 @@ impl ImageProcessor {
         stencil_image
     }
 
-    pub fn create_inverted_stencil(&self, dimensions: ImageDimensions) -> DynamicImage {
+    pub fn create_inverted_stencil(&self, dimensions: &ImageDimensions) -> DynamicImage {
         let mut stencil_image = create_blank_image(dimensions);
         imageproc::drawing::draw_filled_rect_mut(
             &mut stencil_image,
